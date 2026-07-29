@@ -1,0 +1,11 @@
+{
+  "name": "@velnox/config",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "files": ["tsconfig.base.json", "tsconfig.nextjs.json", "tsconfig.nestjs.json", "eslint-preset.js"],
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}
