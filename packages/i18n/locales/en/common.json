@@ -1,0 +1,44 @@
+{
+  "app": {
+    "name": "Velnox",
+    "tagline": "The Perfect Commerce Ecosystem"
+  },
+  "nav": {
+    "home": "Home",
+    "products": "Products",
+    "categories": "Categories",
+    "velrepeat": "VelRepeat",
+    "cart": "Cart",
+    "profile": "Profile",
+    "login": "Login",
+    "register": "Register"
+  },
+  "auth": {
+    "login_title": "Login to Velnox",
+    "login_subtitle": "Manage your shopping and subscriptions",
+    "email": "Email",
+    "password": "Password",
+    "forgot_password": "Forgot Password?",
+    "login_button": "Login",
+    "no_account": "Don't have an account?",
+    "register_link": "Register Now"
+  },
+  "shop": {
+    "featured_products": "Featured Products",
+    "popular_categories": "Popular Categories",
+    "add_to_cart": "Add to Cart",
+    "buy_now": "Buy Now",
+    "subscribe": "Subscribe (VelRepeat)",
+    "price": "Price",
+    "stock": "Stock"
+  },
+  "velrepeat": {
+    "title": "Automatic Subscription",
+    "subtitle": "Receive products regularly, no need to reorder",
+    "frequency": {
+      "weekly": "Weekly",
+      "biweekly": "Every 2 Weeks",
+      "monthly": "Monthly"
+    }
+  }
+}

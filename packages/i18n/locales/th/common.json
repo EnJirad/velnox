@@ -1,0 +1,44 @@
+{
+  "app": {
+    "name": "Velnox",
+    "tagline": "ระบบ Commerce Ecosystem ที่สมบูรณ์แบบ"
+  },
+  "nav": {
+    "home": "หน้าแรก",
+    "products": "สินค้า",
+    "categories": "หมวดหมู่",
+    "velrepeat": "VelRepeat",
+    "cart": "ตะกร้าสินค้า",
+    "profile": "โปรไฟล์",
+    "login": "เข้าสู่ระบบ",
+    "register": "สมัครสมาชิก"
+  },
+  "auth": {
+    "login_title": "เข้าสู่ระบบ Velnox",
+    "login_subtitle": "จัดการการช้อปปิ้งและระบบสมาชิกของคุณ",
+    "email": "อีเมล",
+    "password": "รหัสผ่าน",
+    "forgot_password": "ลืมรหัสผ่าน?",
+    "login_button": "เข้าสู่ระบบ",
+    "no_account": "ยังไม่มีบัญชี?",
+    "register_link": "สมัครสมาชิกใหม่"
+  },
+  "shop": {
+    "featured_products": "สินค้าแนะนำ",
+    "popular_categories": "หมวดหมู่ยอดนิยม",
+    "add_to_cart": "เพิ่มลงตะกร้า",
+    "buy_now": "ซื้อเลย",
+    "subscribe": "สมัครรับสินค้า (VelRepeat)",
+    "price": "ราคา",
+    "stock": "สต็อก"
+  },
+  "velrepeat": {
+    "title": "ระบบสั่งซื้ออัตโนมัติ",
+    "subtitle": "รับสินค้าเป็นประจำ ไม่ต้องสั่งซ้ำ",
+    "frequency": {
+      "weekly": "ทุกสัปดาห์",
+      "biweekly": "ทุก 2 สัปดาห์",
+      "monthly": "ทุกเดือน"
+    }
+  }
+}
