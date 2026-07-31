@@ -7,21 +7,30 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  findAll(
+  async findAll(
     @Query('categoryId') categoryId?: string,
     @Query('shopId') shopId?: string,
     @Query('status') status?: ProductStatus,
+    @Query('search') search?: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '20',
   ) {
-    return this.productsService.findAll({ categoryId, shopId, status });
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 20;
+    
+    return this.productsService.findAll(
+      { categoryId, shopId, status, search },
+      { page: pageNum, limit: limitNum }
+    );
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string) {
     return this.productsService.findOne(id);
   }
 
   @Get('slug/:slug')
-  findBySlug(@Param('slug') slug: string) {
+  async findBySlug(@Param('slug') slug: string) {
     return this.productsService.findBySlug(slug);
   }
 }

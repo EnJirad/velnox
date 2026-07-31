@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 
 export default function HomePage() {
@@ -9,34 +11,34 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="flex flex-col gap-12">
+    <div className="flex flex-col gap-8 sm:gap-12 md:gap-16">
       {/* Hero Section */}
-      <section className="relative overflow-hidden rounded-[2rem] bg-[#2D3748] shadow-2xl">
+      <section className="relative overflow-hidden rounded-xl sm:rounded-2xl md:rounded-[2rem] bg-[#2D3748] shadow-lg sm:shadow-xl md:shadow-2xl">
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#4FD1C5] opacity-20 blur-3xl"></div>
         <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-[#319795] opacity-20 blur-3xl"></div>
         
         <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2">
-          <div className="flex flex-col justify-center p-12 lg:p-20">
-            <span className="mb-4 inline-block w-fit rounded-full bg-[#4FD1C5]/20 px-4 py-1 text-sm font-bold text-[#4FD1C5]">
+          <div className="flex flex-col justify-center p-6 sm:p-8 md:p-12 lg:p-20">
+            <span className="mb-3 sm:mb-4 inline-block w-fit rounded-full bg-[#4FD1C5]/20 px-3 sm:px-4 py-1 text-xs sm:text-sm font-bold text-[#4FD1C5]">
               New Commerce Experience
             </span>
-            <h1 className="mb-6 text-5xl font-black leading-tight text-white lg:text-6xl">
+            <h1 className="mb-4 sm:mb-6 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black leading-tight text-white">
               ช้อปง่าย สั่งซ้ำ <br />
               <span className="text-[#4FD1C5]">อัตโนมัติ</span>
             </h1>
-            <p className="mb-8 text-lg text-slate-300">
+            <p className="mb-6 sm:mb-8 text-sm sm:text-base md:text-lg text-slate-300">
               พบกับ Marketplace รูปแบบใหม่ที่ช่วยให้ชีวิตคุณง่ายขึ้น ด้วยระบบ VelRepeat ที่ช่วยสั่งสินค้าอุปโภคบริโภคให้คุณโดยอัตโนมัติ
             </p>
-            <div className="flex flex-wrap gap-4">
-              <Link href="/products" className="rounded-full bg-[#4FD1C5] px-8 py-4 text-lg font-bold text-white shadow-lg shadow-teal-900/20 transition-all hover:bg-[#319795] hover:shadow-teal-900/40 active:scale-95">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
+              <Link href="/products" className="rounded-lg sm:rounded-full bg-[#4FD1C5] px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-lg font-bold text-white shadow-lg shadow-teal-900/20 transition-all hover:bg-[#319795] hover:shadow-teal-900/40 active:scale-95 text-center">
                 เริ่มช้อปเลย
               </Link>
-              <Link href="/velrepeat" className="rounded-full border-2 border-slate-600 bg-transparent px-8 py-4 text-lg font-bold text-white transition-all hover:bg-slate-700">
+              <Link href="/velrepeat" className="rounded-lg sm:rounded-full border-2 border-slate-600 bg-transparent px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-lg font-bold text-white transition-all hover:bg-slate-700 text-center">
                 รู้จัก VelRepeat
               </Link>
             </div>
           </div>
-          <div className="hidden lg:block relative h-full min-h-[500px]">
+          <div className="hidden lg:block relative h-full min-h-[400px] md:min-h-[500px]">
              <div className="absolute inset-0 bg-gradient-to-l from-[#2D3748] to-transparent z-10"></div>
              <img src="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?q=80&w=1000" className="h-full w-full object-cover opacity-60" alt="Marketplace" />
           </div>
@@ -44,31 +46,31 @@ export default function HomePage() {
       </section>
 
       {/* Trust Badges */}
-      <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
         {[
           { icon: '🚚', title: 'ส่งเร็วทั่วไทย', desc: 'ได้รับสินค้าภายใน 1-3 วัน' },
           { icon: '🛡️', title: 'มั่นใจ 100%', desc: 'รับประกันสินค้าของแท้' },
           { icon: '🔄', title: 'VelRepeat', desc: 'สั่งซื้อซ้ำอัตโนมัติ' },
           { icon: '💳', title: 'จ่ายสะดวก', desc: 'รองรับทุกช่องทาง' },
         ].map((item) => (
-          <div key={item.title} className="flex flex-col items-center rounded-2xl bg-white p-6 text-center shadow-sm border border-slate-50 transition-transform hover:-translate-y-1">
-            <span className="mb-3 text-3xl">{item.icon}</span>
-            <h3 className="font-bold text-[#2D3748]">{item.title}</h3>
-            <p className="text-xs text-slate-500">{item.desc}</p>
+          <div key={item.title} className="flex flex-col items-center rounded-lg sm:rounded-2xl bg-white p-3 sm:p-6 text-center shadow-sm border border-slate-50 transition-transform hover:-translate-y-1">
+            <span className="mb-2 sm:mb-3 text-2xl sm:text-3xl">{item.icon}</span>
+            <h3 className="font-bold text-xs sm:text-sm md:text-base text-[#2D3748]">{item.title}</h3>
+            <p className="text-[10px] sm:text-xs text-slate-500">{item.desc}</p>
           </div>
         ))}
       </section>
 
       {/* Categories */}
       <section>
-        <div className="mb-8 flex items-end justify-between">
+        <div className="mb-6 sm:mb-8 flex items-end justify-between">
           <div>
-            <h2 className="text-3xl font-black text-[#2D3748]">หมวดหมู่สินค้า</h2>
-            <p className="text-slate-500">เลือกช้อปตามหมวดหมู่ที่คุณต้องการ</p>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#2D3748]">หมวดหมู่สินค้า</h2>
+            <p className="text-xs sm:text-sm text-slate-500">เลือกช้อปตามหมวดหมู่ที่คุณต้องการ</p>
           </div>
-          <Link href="/categories" className="text-sm font-bold text-[#4FD1C5] hover:underline">ดูทั้งหมด</Link>
+          <Link href="/categories" className="text-xs sm:text-sm font-bold text-[#4FD1C5] hover:underline">ดูทั้งหมด</Link>
         </div>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-6">
           {[
             { name: 'อาหาร', icon: '🍲', color: 'bg-orange-50' },
             { name: 'เครื่องดื่ม', icon: '🥤', color: 'bg-blue-50' },
@@ -77,11 +79,11 @@ export default function HomePage() {
             { name: 'สุขภาพ', icon: '💊', color: 'bg-green-50' },
             { name: 'สัตว์เลี้ยง', icon: '🐾', color: 'bg-yellow-50' },
           ].map((cat) => (
-            <div key={cat.name} className="group cursor-pointer flex flex-col items-center gap-3 rounded-3xl bg-white p-6 shadow-sm border border-slate-50 transition-all hover:border-[#4FD1C5] hover:shadow-md">
-              <div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${cat.color} text-3xl transition-transform group-hover:scale-110`}>
+            <div key={cat.name} className="group cursor-pointer flex flex-col items-center gap-2 sm:gap-3 rounded-lg sm:rounded-3xl bg-white p-3 sm:p-6 shadow-sm border border-slate-50 transition-all hover:border-[#4FD1C5] hover:shadow-md">
+              <div className={`flex h-12 sm:h-16 w-12 sm:w-16 items-center justify-center rounded-lg sm:rounded-2xl ${cat.color} text-2xl sm:text-3xl transition-transform group-hover:scale-110`}>
                 {cat.icon}
               </div>
-              <span className="text-sm font-bold text-slate-700">{cat.name}</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-700 text-center line-clamp-2">{cat.name}</span>
             </div>
           ))}
         </div>
@@ -89,31 +91,31 @@ export default function HomePage() {
 
       {/* Featured Products */}
       <section>
-        <div className="mb-8 flex items-end justify-between">
+        <div className="mb-6 sm:mb-8 flex items-end justify-between">
           <div>
-            <h2 className="text-3xl font-black text-[#2D3748]">สินค้าแนะนำ</h2>
-            <p className="text-slate-500">คัดสรรสินค้าคุณภาพเพื่อคุณโดยเฉพาะ</p>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#2D3748]">สินค้าแนะนำ</h2>
+            <p className="text-xs sm:text-sm text-slate-500">คัดสรรสินค้าคุณภาพเพื่อคุณโดยเฉพาะ</p>
           </div>
-          <Link href="/products" className="text-sm font-bold text-[#4FD1C5] hover:underline">ดูทั้งหมด</Link>
+          <Link href="/products" className="text-xs sm:text-sm font-bold text-[#4FD1C5] hover:underline">ดูทั้งหมด</Link>
         </div>
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
           {featuredProducts.map((product) => (
-            <div key={product.id} className="group relative flex flex-col overflow-hidden rounded-[2rem] bg-white shadow-sm border border-slate-100 transition-all hover:shadow-xl hover:-translate-y-1">
-              <div className="aspect-[4/5] w-full overflow-hidden bg-slate-100">
+            <div key={product.id} className="group relative flex flex-col overflow-hidden rounded-lg sm:rounded-[2rem] bg-white shadow-sm border border-slate-100 transition-all hover:shadow-xl hover:-translate-y-1">
+              <div className="aspect-[4/5] w-full overflow-hidden bg-slate-100 relative">
                 <img src={product.image} alt={product.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                <button className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/80 text-[#2D3748] backdrop-blur-md transition-colors hover:bg-[#4FD1C5] hover:text-white">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <button className="absolute right-2 sm:right-4 top-2 sm:top-4 flex h-8 sm:h-10 w-8 sm:w-10 items-center justify-center rounded-full bg-white/80 text-[#2D3748] backdrop-blur-md transition-colors hover:bg-[#4FD1C5] hover:text-white">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 sm:h-5 w-4 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                 </button>
               </div>
-              <div className="flex flex-1 flex-col p-6">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#4FD1C5]">{product.category}</span>
-                <h3 className="mt-2 text-lg font-bold text-[#2D3748] line-clamp-2">{product.name}</h3>
-                <div className="mt-auto pt-6 flex items-center justify-between">
-                  <span className="text-2xl font-black text-[#2D3748]">฿{product.price}</span>
-                  <button className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#4FD1C5] text-white shadow-lg shadow-teal-100 transition-all hover:bg-[#319795] active:scale-90">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="flex flex-1 flex-col p-3 sm:p-6">
+                <span className="text-[9px] sm:text-xs font-bold uppercase tracking-wider text-[#4FD1C5]">{product.category}</span>
+                <h3 className="mt-1 sm:mt-2 text-sm sm:text-lg font-bold text-[#2D3748] line-clamp-2">{product.name}</h3>
+                <div className="mt-auto pt-3 sm:pt-6 flex items-center justify-between">
+                  <span className="text-lg sm:text-2xl font-black text-[#2D3748]">฿{product.price}</span>
+                  <button className="flex h-9 sm:h-12 w-9 sm:w-12 items-center justify-center rounded-lg sm:rounded-2xl bg-[#4FD1C5] text-white shadow-lg shadow-teal-100 transition-all hover:bg-[#319795] active:scale-90">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 sm:h-6 w-5 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                   </button>
@@ -125,59 +127,59 @@ export default function HomePage() {
       </section>
 
       {/* VelRepeat Feature Section */}
-      <section className="rounded-[3rem] bg-gradient-to-br from-[#4FD1C5] to-[#319795] p-12 lg:p-20 shadow-2xl shadow-teal-200">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+      <section className="rounded-lg sm:rounded-2xl md:rounded-[3rem] bg-gradient-to-br from-[#4FD1C5] to-[#319795] p-6 sm:p-8 md:p-12 lg:p-20 shadow-lg sm:shadow-xl md:shadow-2xl shadow-teal-200">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-center">
           <div className="text-white">
-            <h2 className="mb-6 text-4xl font-black lg:text-5xl leading-tight">
+            <h2 className="mb-4 sm:mb-6 text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black leading-tight">
               VelRepeat <br />
               <span className="text-teal-900/30 underline decoration-white/30">ผู้ช่วยส่วนตัว</span> เรื่องของใช้
             </h2>
-            <p className="mb-8 text-lg text-teal-50">
+            <p className="mb-6 sm:mb-8 text-sm sm:text-base md:text-lg text-teal-50">
               ไม่ต้องคอยเช็คสต็อกของในบ้าน ไม่ต้องกังวลว่าของจะหมดเมื่อไหร่ ให้ VelRepeat ดูแลคุณด้วยระบบสมัครรับสินค้าอัตโนมัติตามรอบที่คุณต้องการ
             </p>
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {[
                 'เลือกความถี่ได้ตามใจ (รายสัปดาห์, รายเดือน)',
                 'ยกเลิกหรือพักการสั่งซื้อได้ตลอดเวลา',
                 'รับส่วนลดพิเศษสำหรับการสั่งซื้อต่อเนื่อง',
                 'ระบบแจ้งเตือนก่อนส่งสินค้าทุกครั้ง'
               ].map((text) => (
-                <div key={text} className="flex items-center gap-3">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-[#319795]">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <div key={text} className="flex items-center gap-2 sm:gap-3">
+                  <div className="flex h-5 sm:h-6 w-5 sm:w-6 items-center justify-center rounded-full bg-white text-[#319795] flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 sm:h-4 w-3 sm:w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <span className="font-bold">{text}</span>
+                  <span className="font-bold text-sm sm:text-base">{text}</span>
                 </div>
               ))}
             </div>
-            <button className="mt-10 rounded-full bg-white px-10 py-4 font-black text-[#319795] shadow-xl transition-all hover:bg-teal-50 hover:shadow-2xl active:scale-95">
+            <button className="mt-6 sm:mt-10 rounded-lg sm:rounded-full bg-white px-6 sm:px-10 py-3 sm:py-4 font-black text-xs sm:text-base text-[#319795] shadow-xl transition-all hover:bg-teal-50 hover:shadow-2xl active:scale-95 w-full sm:w-auto">
               สมัคร VelRepeat ตอนนี้
             </button>
           </div>
-          <div className="relative">
-             <div className="aspect-square rounded-[2.5rem] bg-white/20 backdrop-blur-sm border border-white/30 p-8 shadow-inner">
-                <div className="h-full w-full rounded-[2rem] bg-white p-6 shadow-2xl">
-                   <div className="flex items-center justify-between mb-8">
-                      <h4 className="font-black text-[#2D3748]">ตารางการส่งสินค้า</h4>
-                      <span className="text-xs font-bold text-[#4FD1C5]">ACTIVE</span>
+          <div className="relative hidden sm:block">
+             <div className="aspect-square rounded-lg sm:rounded-2xl md:rounded-[2.5rem] bg-white/20 backdrop-blur-sm border border-white/30 p-4 sm:p-8 shadow-inner">
+                <div className="h-full w-full rounded-lg sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
+                   <div className="flex items-center justify-between mb-6 sm:mb-8">
+                      <h4 className="font-black text-xs sm:text-base text-[#2D3748]">ตารางการส่งสินค้า</h4>
+                      <span className="text-[9px] sm:text-xs font-bold text-[#4FD1C5]">ACTIVE</span>
                    </div>
-                   <div className="space-y-6">
+                   <div className="space-y-4 sm:space-y-6">
                       {[
                         { name: 'ข้าวหอมมะลิ', date: '15 ส.ค.', status: 'กำลังเตรียม' },
                         { name: 'น้ำดื่มคริสตัล', date: '22 ส.ค.', status: 'รอรอบส่ง' },
                         { name: 'ทิชชู่ Scott', date: '1 ก.ย.', status: 'รอรอบส่ง' },
                       ].map((item) => (
                         <div key={item.name} className="flex items-center justify-between border-b border-slate-50 pb-4">
-                           <div className="flex items-center gap-4">
-                              <div className="h-12 w-12 rounded-xl bg-slate-50"></div>
+                           <div className="flex items-center gap-3 sm:gap-4">
+                              <div className="h-10 sm:h-12 w-10 sm:w-12 rounded-lg sm:rounded-xl bg-slate-50"></div>
                               <div>
-                                 <p className="font-bold text-sm text-[#2D3748]">{item.name}</p>
-                                 <p className="text-xs text-slate-400">รอบส่ง: {item.date}</p>
+                                 <p className="font-bold text-xs sm:text-sm text-[#2D3748]">{item.name}</p>
+                                 <p className="text-[10px] sm:text-xs text-slate-400">รอบส่ง: {item.date}</p>
                               </div>
                            </div>
-                           <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-full">{item.status}</span>
+                           <span className="text-[9px] sm:text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-full whitespace-nowrap">{item.status}</span>
                         </div>
                       ))}
                    </div>
