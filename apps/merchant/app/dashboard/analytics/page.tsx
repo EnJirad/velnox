@@ -1,92 +1,67 @@
-'use client';
-
-import { useEffect, useMemo, useState } from 'react';
-import { StatCard } from '@velnox/ui';
 import { formatCurrency } from '@velnox/utils';
-import { merchantOrderService, productService } from '@/services/merchant.service';
+import { Card } from '@velnox/ui';
+import { merchantProducts, salesByDay } from '@/lib/mock-data';
 
-interface OrderItem {
-  id: string;
-  quantity: number;
-  price: number | string;
-  product: { name: string };
-  order: { status: string; createdAt: string };
-}
-
-interface Product {
-  id: string;
-  name: string;
-  status: string;
-}
+const maxSales = Math.max(...salesByDay.map((d) => d.amount));
+const topProducts = [...merchantProducts].sort((a, b) => b.sold - a.sold).slice(0, 5);
+const totalRevenue = salesByDay.reduce((sum, d) => sum + d.amount, 0);
 
 export default function AnalyticsPage() {
-  const [items, setItems] = useState<OrderItem[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    Promise.all([merchantOrderService.listMine(), productService.listMine()])
-      .then(([o, p]) => {
-        setItems(o as OrderItem[]);
-        setProducts(p as Product[]);
-      })
-      .finally(() => setIsLoading(false));
-  }, []);
-
-  const revenue = items.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
-  const delivered = items.filter((i) => i.order.status === 'DELIVERED').length;
-  const cancelled = items.filter((i) => i.order.status === 'CANCELLED').length;
-  const avgOrderValue = items.length > 0 ? revenue / items.length : 0;
-
-  const topProducts = useMemo(() => {
-    const totals = new Map<string, number>();
-    for (const item of items) {
-      totals.set(item.product.name, (totals.get(item.product.name) ?? 0) + item.quantity);
-    }
-    return Array.from(totals.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-  }, [items]);
-
-  const maxQty = topProducts[0]?.[1] ?? 1;
-
   return (
-    <div>
-      <h1 className="font-display text-2xl font-bold text-ink">ยอดขาย</h1>
-      <p className="mt-1 text-sm text-ink/60">ภาพรวมยอดขายและสินค้าขายดีของร้านคุณ</p>
-
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="ยอดขายรวม" value={isLoading ? '—' : formatCurrency(revenue)} />
-        <StatCard label="มูลค่าเฉลี่ยต่อรายการ" value={isLoading ? '—' : formatCurrency(avgOrderValue)} />
-        <StatCard label="จัดส่งสำเร็จ" value={isLoading ? '—' : String(delivered)} />
-        <StatCard label="ยกเลิก" value={isLoading ? '—' : String(cancelled)} />
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-xl font-semibold text-slate-900">วิเคราะห์ยอดขาย</h1>
+        <p className="text-sm text-slate-500">ภาพรวมผลการดำเนินงานร้านค้าของคุณ</p>
       </div>
 
-      <div className="mt-8 rounded-lg border border-line bg-white p-5">
-        <h2 className="mb-4 font-semibold text-ink">สินค้าขายดี</h2>
-        {topProducts.length === 0 ? (
-          <p className="text-sm text-ink/50">ยังไม่มีข้อมูลยอดขาย</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {topProducts.map(([name, qty]) => (
-              <div key={name} className="flex items-center gap-3">
-                <span className="w-32 shrink-0 truncate text-sm text-ink/70">{name}</span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-canvas">
-                  <div
-                    className="h-full rounded-full bg-teal"
-                    style={{ width: `${(qty / maxQty) * 100}%` }}
-                  />
-                </div>
-                <span className="w-10 shrink-0 text-right font-mono text-sm text-ink/70">{qty}</span>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card>
+          <p className="text-xs text-slate-500">ยอดขายรวม 7 วัน</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{formatCurrency(totalRevenue)}</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-500">อัตราการแปลงยอดขาย</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">3.8%</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-500">มูลค่าเฉลี่ยต่อคำสั่งซื้อ</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{formatCurrency(958)}</p>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <Card>
+          <p className="mb-4 text-sm font-semibold text-slate-900">แนวโน้มยอดขาย</p>
+          <div className="flex h-56 items-end gap-3">
+            {salesByDay.map((d) => (
+              <div key={d.day} className="flex flex-1 flex-col items-center gap-2">
+                <span className="text-[10px] text-slate-400">{formatCurrency(d.amount)}</span>
+                <div
+                  className="w-full rounded-t-md bg-gradient-to-t from-teal-700 to-teal-400"
+                  style={{ height: `${(d.amount / maxSales) * 100}%` }}
+                />
+                <span className="text-xs text-slate-500">{d.day}</span>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </Card>
 
-      <p className="mt-4 text-xs text-ink/40">
-        มีสินค้าทั้งหมด {products.length} รายการในร้าน
-      </p>
+        <Card>
+          <p className="mb-4 text-sm font-semibold text-slate-900">สินค้าขายดี</p>
+          <ul className="flex flex-col gap-3">
+            {topProducts.map((p, i) => (
+              <li key={p.id} className="flex items-center gap-3">
+                <span className="w-4 text-xs font-semibold text-slate-400">{i + 1}</span>
+                <span className="text-lg">{p.emoji}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-800">{p.name}</p>
+                  <p className="text-xs text-slate-400">ขายแล้ว {p.sold} ชิ้น</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
     </div>
   );
 }

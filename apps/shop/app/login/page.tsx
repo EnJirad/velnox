@@ -1,77 +1,38 @@
-'use client';
-
-import { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Button, Input } from '@velnox/ui';
-import { useAuth } from '@/hooks/use-auth';
-
-function LoginForm() {
-  const { login } = useAuth();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-    try {
-      await login(email, password);
-      router.push(searchParams.get('next') || '/');
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  return (
-    <div className="mx-auto max-w-sm px-4 py-16">
-      <h1 className="font-display text-2xl font-bold text-ink">เข้าสู่ระบบ</h1>
-      <p className="mt-1 text-sm text-ink/60">ยินดีต้อนรับกลับสู่ VelShop</p>
-
-      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-        <Input
-          label="อีเมล"
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <Input
-          label="รหัสผ่าน"
-          type="password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        {error && <p className="text-sm text-brick">{error}</p>}
-        <Button type="submit" isLoading={isLoading}>
-          เข้าสู่ระบบ
-        </Button>
-      </form>
-
-      <p className="mt-6 text-center text-sm text-ink/60">
-        ยังไม่มีบัญชี?{' '}
-        <Link href="/register" className="font-medium text-teal hover:underline">
-          สมัครสมาชิก
-        </Link>
-      </p>
-      <p className="mt-2 text-center text-xs text-ink/40">
-        ทดลองใช้: merchant@velnox.dev / Merchant@12345
-      </p>
-    </div>
-  );
-}
 
 export default function LoginPage() {
   return (
-    <Suspense>
-      <LoginForm />
-    </Suspense>
+    <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-12">
+      <div className="mb-6 text-center">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-teal-700 text-xl font-bold text-white">V</div>
+        <h1 className="text-xl font-semibold text-slate-900">เข้าสู่ระบบ VelShop</h1>
+        <p className="text-sm text-slate-500">ยินดีต้อนรับกลับ กรอกข้อมูลเพื่อเข้าสู่ระบบ</p>
+      </div>
+      <form className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-6">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700">อีเมล</label>
+          <input type="email" placeholder="you@example.com" className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700">รหัสผ่าน</label>
+          <input type="password" placeholder="••••••••" className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600" />
+        </div>
+        <div className="flex items-center justify-between text-xs">
+          <label className="flex items-center gap-2 text-slate-600">
+            <input type="checkbox" /> จดจำฉันไว้
+          </label>
+          <Link href="#" className="text-teal-700 hover:underline">ลืมรหัสผ่าน?</Link>
+        </div>
+        <button type="submit" className="rounded-md bg-teal-700 py-2.5 text-sm font-semibold text-white hover:bg-teal-800">
+          เข้าสู่ระบบ
+        </button>
+      </form>
+      <p className="mt-4 text-center text-sm text-slate-500">
+        ยังไม่มีบัญชี?{' '}
+        <Link href="/register" className="font-medium text-teal-700 hover:underline">
+          สมัครสมาชิก
+        </Link>
+      </p>
+    </div>
   );
 }

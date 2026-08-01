@@ -1,85 +1,59 @@
 import { create } from 'zustand';
-import { cartApi } from '@/services/catalog.service';
-
-interface CartProductImage {
-  url: string;
-}
-
-interface CartProduct {
-  id: string;
-  name: string;
-  slug: string;
-  price: number | string;
-  images: CartProductImage[];
-  shop?: { name: string };
-}
+import { persist } from 'zustand/middleware';
 
 export interface CartItem {
-  id: string;
   productId: string;
+  name: string;
+  price: number;
+  emoji: string;
+  shopName: string;
   quantity: number;
-  price: number | string;
-  product: CartProduct;
+  stock: number;
 }
 
 interface CartState {
   items: CartItem[];
-  isLoading: boolean;
-  error: string | null;
-  fetchCart: () => Promise<void>;
-  addItem: (productId: string, quantity?: number) => Promise<void>;
-  updateItem: (itemId: string, quantity: number) => Promise<void>;
-  removeItem: (itemId: string) => Promise<void>;
+  addItem: (item: Omit<CartItem, 'quantity'>, quantity?: number) => void;
+  removeItem: (productId: string) => void;
+  setQuantity: (productId: string, quantity: number) => void;
   clear: () => void;
 }
 
-export const useCartStore = create<CartState>((set, get) => ({
-  items: [],
-  isLoading: false,
-  error: null,
+export const useCartStore = create<CartState>()(
+  persist(
+    (set, get) => ({
+      items: [],
+      addItem: (item, quantity = 1) => {
+        const existing = get().items.find((i) => i.productId === item.productId);
+        if (existing) {
+          set({
+            items: get().items.map((i) =>
+              i.productId === item.productId
+                ? { ...i, quantity: Math.min(i.quantity + quantity, i.stock) }
+                : i,
+            ),
+          });
+        } else {
+          set({ items: [...get().items, { ...item, quantity }] });
+        }
+      },
+      removeItem: (productId) => set({ items: get().items.filter((i) => i.productId !== productId) }),
+      setQuantity: (productId, quantity) =>
+        set({
+          items: get().items.map((i) =>
+            i.productId === productId ? { ...i, quantity: Math.max(1, Math.min(quantity, i.stock)) } : i,
+          ),
+        }),
+      clear: () => set({ items: [] }),
+    }),
+    { name: 'velnox-shop-cart' },
+  ),
+);
 
-  fetchCart: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const cart = await cartApi.get<{ items: CartItem[] }>();
-      set({ items: cart.items ?? [], isLoading: false });
-    } catch (err) {
-      set({ isLoading: false, error: (err as Error).message });
-    }
-  },
+export function useCartCount() {
+  return useCartStore((state) => state.items.reduce((sum, i) => sum + i.quantity, 0));
+}
 
-  addItem: async (productId, quantity = 1) => {
-    set({ error: null });
-    try {
-      const cart = await cartApi.addItem(productId, quantity) as { items: CartItem[] };
-      set({ items: cart.items ?? [] });
-    } catch (err) {
-      set({ error: (err as Error).message });
-      throw err;
-    }
-  },
-
-  updateItem: async (itemId, quantity) => {
-    const previous = get().items;
-    set({
-      items: previous.map((item) => (item.id === itemId ? { ...item, quantity } : item)),
-    });
-    try {
-      await cartApi.updateItem(itemId, quantity);
-    } catch (err) {
-      set({ items: previous, error: (err as Error).message });
-    }
-  },
-
-  removeItem: async (itemId) => {
-    const previous = get().items;
-    set({ items: previous.filter((item) => item.id !== itemId) });
-    try {
-      await cartApi.removeItem(itemId);
-    } catch (err) {
-      set({ items: previous, error: (err as Error).message });
-    }
-  },
-
-  clear: () => set({ items: [] }),
-}));
+export function useCartTotal() {
+  return useCartStore((state) => state.items.reduce((sum, i) => sum + i.quantity * i.price, 0));
+}

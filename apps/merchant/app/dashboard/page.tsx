@@ -1,84 +1,106 @@
-'use client';
+import { formatCurrency, formatDate } from '@velnox/utils';
+import { Badge, Card } from '@velnox/ui';
+import { dashboardStats, merchantOrders, orderStatusLabel, orderStatusTone, salesByDay } from '@/lib/mock-data';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { StatCard, Badge } from '@velnox/ui';
-import { formatCurrency } from '@velnox/utils';
-import { productService, merchantOrderService } from '@/services/merchant.service';
-
-interface Product {
-  id: string;
-  status: string;
-  stock: number;
-}
-
-interface OrderItem {
-  id: string;
-  quantity: number;
-  price: number | string;
-  product: { name: string };
-  order: { orderNumber: string; status: string; createdAt: string; user: { name: string } };
-}
+const maxSales = Math.max(...salesByDay.map((d) => d.amount));
 
 export default function DashboardHomePage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    Promise.all([productService.listMine(), merchantOrderService.listMine()])
-      .then(([p, o]) => {
-        setProducts(p as Product[]);
-        setOrderItems(o as OrderItem[]);
-      })
-      .finally(() => setIsLoading(false));
-  }, []);
-
-  const revenue = orderItems.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
-  const activeProducts = products.filter((p) => p.status === 'ACTIVE').length;
-  const lowStock = products.filter((p) => p.stock <= 5 && p.status === 'ACTIVE').length;
-  const recentOrders = orderItems.slice(0, 6);
-
   return (
-    <div>
-      <h1 className="font-display text-2xl font-bold text-ink">ภาพรวมร้านค้า</h1>
-      <p className="mt-1 text-sm text-ink/60">สรุปข้อมูลสำคัญของร้านคุณวันนี้</p>
-
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="ยอดขายสะสม" value={isLoading ? '—' : formatCurrency(revenue)} />
-        <StatCard label="สินค้าที่ขายอยู่" value={isLoading ? '—' : String(activeProducts)} />
-        <StatCard label="คำสั่งซื้อ" value={isLoading ? '—' : String(orderItems.length)} />
-        <StatCard label="สินค้าใกล้หมด" value={isLoading ? '—' : String(lowStock)} hint="≤ 5 ชิ้น" />
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-xl font-semibold text-slate-900">ภาพรวมร้านค้า</h1>
+        <p className="text-sm text-slate-500">สรุปข้อมูลสำคัญของร้านคุณวันนี้</p>
       </div>
 
-      <div className="mt-8 rounded-lg border border-line bg-white">
-        <div className="flex items-center justify-between border-b border-line p-4">
-          <h2 className="font-semibold text-ink">คำสั่งซื้อล่าสุด</h2>
-          <Link href="/dashboard/orders" className="text-sm text-teal hover:underline">
-            ดูทั้งหมด →
-          </Link>
-        </div>
-        {recentOrders.length === 0 ? (
-          <p className="p-6 text-sm text-ink/50">ยังไม่มีคำสั่งซื้อ</p>
-        ) : (
-          <div className="divide-y divide-line">
-            {recentOrders.map((item) => (
-              <div key={item.id} className="flex items-center justify-between px-4 py-3 text-sm">
-                <div>
-                  <div className="font-mono font-medium text-ink">{item.order.orderNumber}</div>
-                  <div className="text-xs text-ink/50">
-                    {item.product.name} × {item.quantity} · {item.order.user.name}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono">{formatCurrency(Number(item.price) * item.quantity)}</span>
-                  <Badge tone="teal">{item.order.status}</Badge>
-                </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <p className="text-xs text-slate-500">ยอดขายวันนี้</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{formatCurrency(dashboardStats.revenueToday)}</p>
+          <p className="mt-1 text-xs font-medium text-emerald-600">▲ {dashboardStats.revenueGrowth}% จากเมื่อวาน</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-500">คำสั่งซื้อวันนี้</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{dashboardStats.ordersToday}</p>
+          <p className="mt-1 text-xs font-medium text-emerald-600">▲ {dashboardStats.ordersGrowth}% จากเมื่อวาน</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-500">รอดำเนินการ</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{dashboardStats.pendingOrders}</p>
+          <p className="mt-1 text-xs text-amber-600">ต้องยืนยัน/แพ็คสินค้า</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-500">สินค้าใกล้หมดสต็อก</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{dashboardStats.lowStockCount}</p>
+          <p className="mt-1 text-xs text-red-600">ควรเติมสต็อกเร็วๆ นี้</p>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <Card>
+          <p className="mb-4 text-sm font-semibold text-slate-900">ยอดขาย 7 วันล่าสุด</p>
+          <div className="flex h-48 items-end gap-3">
+            {salesByDay.map((d) => (
+              <div key={d.day} className="flex flex-1 flex-col items-center gap-2">
+                <div
+                  className="w-full rounded-t-md bg-teal-600"
+                  style={{ height: `${(d.amount / maxSales) * 100}%` }}
+                  title={formatCurrency(d.amount)}
+                />
+                <span className="text-xs text-slate-500">{d.day}</span>
               </div>
             ))}
           </div>
-        )}
+        </Card>
+
+        <Card>
+          <p className="mb-4 text-sm font-semibold text-slate-900">สิ่งที่ต้องทำ</p>
+          <ul className="flex flex-col gap-3 text-sm">
+            <li className="flex items-center justify-between">
+              <span className="text-slate-600">คำสั่งซื้อรอยืนยัน</span>
+              <Badge tone="warning">{dashboardStats.pendingOrders}</Badge>
+            </li>
+            <li className="flex items-center justify-between">
+              <span className="text-slate-600">สินค้าใกล้หมด</span>
+              <Badge tone="danger">{dashboardStats.lowStockCount}</Badge>
+            </li>
+            <li className="flex items-center justify-between">
+              <span className="text-slate-600">ข้อความจากลูกค้าใหม่</span>
+              <Badge tone="info">3</Badge>
+            </li>
+            <li className="flex items-center justify-between">
+              <span className="text-slate-600">รีวิวที่ยังไม่ตอบกลับ</span>
+              <Badge tone="neutral">5</Badge>
+            </li>
+          </ul>
+        </Card>
       </div>
+
+      <Card className="p-0">
+        <div className="flex items-center justify-between border-b border-slate-100 p-4">
+          <p className="text-sm font-semibold text-slate-900">คำสั่งซื้อล่าสุด</p>
+          <a href="/dashboard/orders" className="text-xs font-medium text-teal-700 hover:underline">ดูทั้งหมด →</a>
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
+              <th className="px-4 py-2 font-medium">คำสั่งซื้อ</th>
+              <th className="px-4 py-2 font-medium">วันที่</th>
+              <th className="px-4 py-2 font-medium">ยอดรวม</th>
+              <th className="px-4 py-2 font-medium">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {merchantOrders.slice(0, 5).map((o) => (
+              <tr key={o.id} className="border-b border-slate-50 last:border-0">
+                <td className="px-4 py-3 font-medium text-slate-800">#{o.orderNumber}</td>
+                <td className="px-4 py-3 text-slate-500">{formatDate(o.createdAt)}</td>
+                <td className="px-4 py-3 text-slate-800">{formatCurrency(o.total)}</td>
+                <td className="px-4 py-3"><Badge tone={orderStatusTone[o.status]}>{orderStatusLabel[o.status]}</Badge></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
     </div>
   );
 }
