@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { platformStats } from '@/lib/mock-data';
+import { useLanguage } from '@/components/providers/language-provider';
+import { LanguageSwitcher } from './language-switcher';
 
 interface NavLink {
   href: string;
@@ -11,33 +13,34 @@ interface NavLink {
   badge?: number;
 }
 
-const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
-  {
-    title: 'ภาพรวม',
-    links: [{ href: '/admin', label: 'แดชบอร์ด', icon: '📊' }],
-  },
-  {
-    title: 'การจัดการแพลตฟอร์ม',
-    links: [
-      { href: '/admin/users', label: 'ผู้ใช้งาน', icon: '👤' },
-      { href: '/admin/merchants', label: 'ร้านค้า/พ่อค้า', icon: '🏬', badge: platformStats.pendingMerchants },
-      { href: '/admin/shops', label: 'หน้าร้าน', icon: '🏪' },
-      { href: '/admin/products', label: 'สินค้า', icon: '📦', badge: platformStats.pendingProducts },
-      { href: '/admin/orders', label: 'คำสั่งซื้อ', icon: '🧾' },
-    ],
-  },
-  {
-    title: 'ข้อมูลเชิงลึก',
-    links: [
-      { href: '/admin/reports', label: 'รายงาน', icon: '📄' },
-      { href: '/admin/analytics', label: 'วิเคราะห์ข้อมูล', icon: '📈' },
-      { href: '/admin/settings', label: 'ตั้งค่าระบบ', icon: '⚙️' },
-    ],
-  },
-];
-
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { t } = useLanguage();
+
+  const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
+    {
+      title: t('admin.overview'),
+      links: [{ href: '/admin', label: t('admin.overview'), icon: '📊' }],
+    },
+    {
+      title: t('admin.merchants'),
+      links: [
+        { href: '/admin/users', label: t('admin.users'), icon: '👤' },
+        { href: '/admin/merchants', label: t('admin.merchants'), icon: '🏬', badge: platformStats.pendingMerchants },
+        { href: '/admin/shops', label: t('admin.shops'), icon: '🏪' },
+        { href: '/admin/products', label: t('admin.products'), icon: '📦', badge: platformStats.pendingProducts },
+        { href: '/admin/orders', label: t('admin.orders'), icon: '🧾' },
+      ],
+    },
+    {
+      title: t('admin.analytics'),
+      links: [
+        { href: '/admin/reports', label: t('admin.reports'), icon: '📄' },
+        { href: '/admin/analytics', label: t('admin.analytics'), icon: '📈' },
+        { href: '/admin/settings', label: t('admin.settings'), icon: '⚙️' },
+      ],
+    },
+  ];
 
   return (
     <div className="flex min-h-screen bg-slate-100">
@@ -50,8 +53,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto p-3 text-sm">
-          {NAV_GROUPS.map((group) => (
-            <div key={group.title} className="mb-4">
+          {NAV_GROUPS.map((group, groupIndex) => (
+            <div key={`${group.title}-${groupIndex}`} className="mb-4">
               <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 {group.title}
               </p>
@@ -84,7 +87,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="border-t border-slate-800 p-3">
           <Link href="/" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-400 hover:bg-slate-800">
-            ↩️ ออกจากระบบ
+            ↩️ {t('admin.logout')}
           </Link>
         </div>
       </aside>
@@ -96,6 +99,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             <p className="text-xs text-slate-400">Velnox Platform Operations</p>
           </div>
           <div className="flex items-center gap-3">
+            <LanguageSwitcher />
             <button className="relative rounded-full p-2 hover:bg-slate-100">
               🔔
               <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-orange-500" />

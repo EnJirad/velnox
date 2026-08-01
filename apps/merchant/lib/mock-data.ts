@@ -64,4 +64,5 @@ export const dashboardStats = {
   ordersGrowth: 6.2,
   pendingOrders: merchantOrders.filter((o) => o.status === 'PENDING' || o.status === 'CONFIRMED').length,
   lowStockCount: merchantProducts.filter((p) => p.stock > 0 && p.stock <= 10).length,
+  velrepeatSubscribers: 37,
 };

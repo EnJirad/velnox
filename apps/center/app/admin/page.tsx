@@ -14,7 +14,7 @@ export default function AdminOverviewPage() {
         <p className="text-sm text-slate-500">สรุปสถานะการดำเนินงานของ Velnox ทั้งหมด</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <p className="text-xs text-slate-500">มูลค่าซื้อขายรวม (GMV) เดือนนี้</p>
           <p className="mt-1 text-2xl font-bold text-slate-900">{formatCurrency(platformStats.gmv)}</p>
@@ -34,6 +34,11 @@ export default function AdminOverviewPage() {
           <p className="text-xs text-slate-500">คำสั่งซื้อที่ยังไม่เสร็จสิ้น</p>
           <p className="mt-1 text-2xl font-bold text-slate-900">{platformStats.openOrders}</p>
           <p className="mt-1 text-xs text-slate-400">กำลังดำเนินการอยู่</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-500">🔁 VelRepeat ที่ใช้งานอยู่</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{platformStats.velrepeatActive.toLocaleString('th-TH')}</p>
+          <p className="mt-1 text-xs text-slate-400">พักไว้ {platformStats.velrepeatPaused} รายการ</p>
         </Card>
       </div>
 

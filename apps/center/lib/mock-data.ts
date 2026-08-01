@@ -116,4 +116,6 @@ export const platformStats = {
   pendingMerchants: adminMerchants.filter((m) => m.status === 'PENDING').length,
   pendingProducts: adminProducts.filter((p) => p.status === 'PENDING_REVIEW').length,
   openOrders: platformOrders.filter((o) => o.status !== 'DELIVERED' && o.status !== 'CANCELLED').length,
+  velrepeatActive: 512,
+  velrepeatPaused: 48,
 };

@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { dashboardStats } from '@/lib/mock-data';
+import { useLanguage } from '@/components/providers/language-provider';
+import { LanguageSwitcher } from './language-switcher';
 
 interface NavLink {
   href: string;
@@ -11,17 +13,18 @@ interface NavLink {
   badge?: number;
 }
 
-const NAV_LINKS: NavLink[] = [
-  { href: '/dashboard', label: 'ภาพรวม', icon: '📊' },
-  { href: '/dashboard/shop', label: 'ร้านค้าของฉัน', icon: '🏪' },
-  { href: '/dashboard/products', label: 'สินค้า', icon: '📦' },
-  { href: '/dashboard/inventory', label: 'คลังสินค้า', icon: '🗃️' },
-  { href: '/dashboard/orders', label: 'คำสั่งซื้อ', icon: '🧾', badge: dashboardStats.pendingOrders },
-  { href: '/dashboard/analytics', label: 'วิเคราะห์ยอดขาย', icon: '📈' },
-];
-
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { t } = useLanguage();
+
+  const NAV_LINKS: NavLink[] = [
+    { href: '/dashboard', label: t('merchant.overview'), icon: '📊' },
+    { href: '/dashboard/shop', label: t('merchant.myShop'), icon: '🏪' },
+    { href: '/dashboard/products', label: t('merchant.products'), icon: '📦' },
+    { href: '/dashboard/inventory', label: t('merchant.inventory'), icon: '🗃️' },
+    { href: '/dashboard/orders', label: t('merchant.orders'), icon: '🧾', badge: dashboardStats.pendingOrders },
+    { href: '/dashboard/analytics', label: t('merchant.analytics'), icon: '📈' },
+  ];
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -59,7 +62,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="border-t border-slate-100 p-3">
           <Link href="/" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-500 hover:bg-slate-50">
-            ↩️ ออกจากระบบ
+            ↩️ {t('merchant.logout')}
           </Link>
         </div>
       </aside>
@@ -71,6 +74,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <p className="text-xs text-slate-400">ยอดขายวันนี้ปรับตัวดีขึ้น {dashboardStats.revenueGrowth}%</p>
           </div>
           <div className="flex items-center gap-3">
+            <LanguageSwitcher />
             <button className="relative rounded-full p-2 hover:bg-slate-100">
               🔔
               <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-orange-500" />

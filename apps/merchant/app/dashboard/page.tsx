@@ -12,7 +12,7 @@ export default function DashboardHomePage() {
         <p className="text-sm text-slate-500">สรุปข้อมูลสำคัญของร้านคุณวันนี้</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <p className="text-xs text-slate-500">ยอดขายวันนี้</p>
           <p className="mt-1 text-2xl font-bold text-slate-900">{formatCurrency(dashboardStats.revenueToday)}</p>
@@ -27,6 +27,11 @@ export default function DashboardHomePage() {
           <p className="text-xs text-slate-500">รอดำเนินการ</p>
           <p className="mt-1 text-2xl font-bold text-slate-900">{dashboardStats.pendingOrders}</p>
           <p className="mt-1 text-xs text-amber-600">ต้องยืนยัน/แพ็คสินค้า</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-500">🔁 จำนวน VelRepeat</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{dashboardStats.velrepeatSubscribers}</p>
+          <p className="mt-1 text-xs text-teal-600">ลูกค้าสมัครรับสินค้าประจำ</p>
         </Card>
         <Card>
           <p className="text-xs text-slate-500">สินค้าใกล้หมดสต็อก</p>

@@ -6,6 +6,7 @@ const nextConfig = {
     '@velnox/types',
     '@velnox/utils',
     '@velnox/config',
+    '@velnox/i18n',
   ],
 
   images: {

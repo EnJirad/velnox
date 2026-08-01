@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { formatCurrency } from '@velnox/utils';
 import { products } from '@/lib/mock-data';
 import { AddToCartButton } from '@/components/add-to-cart-button';
+import { VelRepeatWidget } from '@/components/velrepeat-widget';
 
 export function generateStaticParams() {
   return products.map((p) => ({ slug: p.slug }));
@@ -60,6 +61,8 @@ export default function ProductDetailPage({ params }: { params: { slug: string }
               ซื้อเลย
             </button>
           </div>
+
+          <VelRepeatWidget product={product} />
 
           <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 p-4 text-xs text-slate-600">
             <span>🚚 จัดส่งภายใน 1-3 วันทำการ</span>

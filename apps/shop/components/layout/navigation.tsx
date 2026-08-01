@@ -4,16 +4,20 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useCartCount } from '@/stores/cart-store';
 import { useAuthStore } from '@/stores/auth-store';
-
-const NAV_LINKS = [
-  { href: '/products', label: 'สินค้าทั้งหมด' },
-  { href: '/orders', label: 'คำสั่งซื้อของฉัน' },
-];
+import { useLanguage } from '@/components/providers/language-provider';
+import { LanguageSwitcher } from './language-switcher';
 
 export function Navigation() {
   const cartCount = useCartCount();
   const user = useAuthStore((s) => s.user);
+  const { t } = useLanguage();
   const [query, setQuery] = useState('');
+
+  const NAV_LINKS = [
+    { href: '/products', label: t('nav.products') },
+    { href: '/orders', label: t('nav.orders') },
+    { href: '/subscriptions', label: t('nav.subscriptions') },
+  ];
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -21,7 +25,7 @@ export function Navigation() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-1.5 text-xs">
           <span>🚚 ส่งฟรีทุกออเดอร์ตั้งแต่ 990 บาทขึ้นไป</span>
           <div className="hidden gap-4 sm:flex">
-            <Link href="/orders" className="hover:underline">ติดตามคำสั่งซื้อ</Link>
+            <Link href="/orders" className="hover:underline">{t('nav.orders')}</Link>
             <span>ช่วยเหลือ · 02-000-0000</span>
           </div>
         </div>
@@ -46,7 +50,7 @@ export function Navigation() {
             type="submit"
             className="rounded-r-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
           >
-            ค้นหา
+            {t('common.search')}
           </button>
         </form>
 
@@ -57,8 +61,9 @@ export function Navigation() {
             </Link>
           ))}
           <Link href="/profile" className="hidden hover:text-teal-700 sm:inline">
-            {user ? user.name.split(' ')[0] : 'บัญชีของฉัน'}
+            {user ? user.name.split(' ')[0] : t('nav.account')}
           </Link>
+          <LanguageSwitcher />
           <Link href="/cart" className="relative flex items-center hover:text-teal-700">
             <span className="text-xl">🛒</span>
             {cartCount > 0 && (
