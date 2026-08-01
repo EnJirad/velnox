@@ -1,67 +1,99 @@
+'use client';
+
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
+import { orderApi } from '@/services/catalog.service';
+import { Badge, Button, EmptyState } from '@velnox/ui';
+import { formatCurrency, formatDate } from '@velnox/utils';
+
+interface OrderSummary {
+  id: string;
+  orderNumber: string;
+  status: string;
+  total: number | string;
+  createdAt: string;
+  items: { id: string }[];
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  PENDING: 'รอดำเนินการ',
+  CONFIRMED: 'ยืนยันแล้ว',
+  PROCESSING: 'กำลังเตรียมสินค้า',
+  SHIPPED: 'จัดส่งแล้ว',
+  DELIVERED: 'สำเร็จ',
+  CANCELLED: 'ยกเลิก',
+};
+
+const STATUS_TONE: Record<string, 'neutral' | 'teal' | 'marigold' | 'brick' | 'success'> = {
+  PENDING: 'marigold',
+  CONFIRMED: 'teal',
+  PROCESSING: 'teal',
+  SHIPPED: 'teal',
+  DELIVERED: 'success',
+  CANCELLED: 'brick',
+};
+
 export default function OrdersPage() {
-  const orders = [
-    { id: '#VEX-9921', date: '31 ก.ค. 2026', total: '฿490', status: 'SHIPPED', items: 2 },
-    { id: '#VEX-8812', date: '15 ก.ค. 2026', total: '฿1,250', status: 'DELIVERED', items: 5 },
-    { id: '#VEX-7756', date: '01 ก.ค. 2026', total: '฿89', status: 'CANCELLED', items: 1 },
-  ];
+  const { isAuthenticated } = useAuth();
+  const router = useRouter();
+  const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace('/login?next=/orders');
+      return;
+    }
+    orderApi
+      .listMine()
+      .then((data) => setOrders(data as OrderSummary[]))
+      .finally(() => setIsLoading(false));
+  }, [isAuthenticated, router]);
 
   return (
-    <div className="flex flex-col gap-8">
-      <header>
-        <h1 className="text-3xl font-black text-[#2D3748]">คำสั่งซื้อของฉัน</h1>
-        <p className="text-slate-500 font-medium">ติดตามสถานะและประวัติการสั่งซื้อทั้งหมดของคุณ</p>
-      </header>
+    <div className="mx-auto max-w-3xl px-4 py-10">
+      <h1 className="mb-6 font-display text-2xl font-bold text-ink">คำสั่งซื้อของฉัน</h1>
 
-      <div className="flex flex-col gap-6">
-        {orders.map((order) => (
-          <div key={order.id} className="group overflow-hidden rounded-[2.5rem] bg-white shadow-sm border border-slate-50 transition-all hover:shadow-xl">
-            <div className="flex flex-col md:flex-row md:items-center justify-between p-8">
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Order ID</span>
-                <h3 className="text-xl font-black text-[#2D3748]">{order.id}</h3>
-                <p className="text-sm font-bold text-slate-400">{order.date}</p>
+      {isLoading ? (
+        <p className="text-ink/50">กำลังโหลด...</p>
+      ) : orders.length === 0 ? (
+        <EmptyState
+          title="ยังไม่มีคำสั่งซื้อ"
+          description="เมื่อคุณสั่งซื้อสินค้า รายการจะแสดงที่นี่"
+          action={
+            <Link href="/products">
+              <Button>เลือกซื้อสินค้า</Button>
+            </Link>
+          }
+        />
+      ) : (
+        <div className="flex flex-col gap-3">
+          {orders.map((order) => (
+            <Link
+              key={order.id}
+              href={`/orders/${order.id}`}
+              className="flex items-center justify-between rounded-lg border border-line bg-white p-4 hover:border-teal"
+            >
+              <div>
+                <div className="font-mono text-sm font-semibold text-ink">{order.orderNumber}</div>
+                <div className="text-xs text-ink/50">
+                  {formatDate(order.createdAt)} · {order.items.length} รายการ
+                </div>
               </div>
-              
-              <div className="mt-4 md:mt-0 flex flex-wrap gap-8 items-center">
-                 <div className="text-center md:text-left">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">รายการ</p>
-                    <p className="font-bold text-[#2D3748]">{order.items} ชิ้น</p>
-                 </div>
-                 <div className="text-center md:text-left">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ยอดรวมสุทธิ</p>
-                    <p className="font-black text-[#4FD1C5] text-xl">{order.total}</p>
-                 </div>
-                 <div className="text-center md:text-left">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">สถานะ</p>
-                    <span className={`rounded-full px-4 py-1 text-[10px] font-black uppercase ${
-                      order.status === 'DELIVERED' ? 'bg-teal-50 text-[#319795]' : 
-                      order.status === 'SHIPPED' ? 'bg-blue-50 text-blue-600' : 
-                      'bg-red-50 text-red-500'
-                    }`}>
-                      {order.status}
-                    </span>
-                 </div>
-                 <button className="rounded-2xl bg-slate-50 px-6 py-3 text-sm font-bold text-slate-600 hover:bg-[#4FD1C5] hover:text-white transition-all">
-                    ดูรายละเอียด
-                 </button>
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-sm font-semibold text-teal">
+                  {formatCurrency(Number(order.total))}
+                </span>
+                <Badge tone={STATUS_TONE[order.status] ?? 'neutral'}>
+                  {STATUS_LABEL[order.status] ?? order.status}
+                </Badge>
               </div>
-            </div>
-            
-            {/* Order Progress Bar for Shipped items */}
-            {order.status === 'SHIPPED' && (
-              <div className="bg-slate-50/50 p-8 border-t border-slate-50">
-                 <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-bold text-[#319795]">พัสดุกำลังเดินทาง</span>
-                    <span className="text-xs font-medium text-slate-400">คาดว่าจะถึงใน 2 วัน</span>
-                 </div>
-                 <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
-                    <div className="h-full w-[65%] rounded-full bg-[#4FD1C5] shadow-lg shadow-teal-100"></div>
-                 </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,101 +1,143 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button, Input } from '@velnox/ui';
+import { formatCurrency } from '@velnox/utils';
+import { useCartStore } from '@/stores/cart-store';
+import { useAuth } from '@/hooks/use-auth';
+import { orderApi } from '@/services/catalog.service';
+
+const SHIPPING_FEE = 40;
+
 export default function CheckoutPage() {
+  const router = useRouter();
+  const { isAuthenticated, user } = useAuth();
+  const { items, fetchCart } = useCartStore();
+  const [form, setForm] = useState({
+    recipientName: '',
+    phone: '',
+    addressLine: '',
+    city: '',
+    province: '',
+    postalCode: '',
+  });
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace('/login?next=/checkout');
+      return;
+    }
+    fetchCart();
+  }, [isAuthenticated, fetchCart, router]);
+
+  useEffect(() => {
+    if (user?.name) setForm((f) => ({ ...f, recipientName: user.name }));
+  }, [user]);
+
+  const subtotal = items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+  const total = subtotal + SHIPPING_FEE;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setStatus('loading');
+    setError('');
+    try {
+      const order = await orderApi.checkout(form) as { id: string };
+      router.push(`/orders/${order.id}`);
+    } catch (err) {
+      setError((err as Error).message);
+      setStatus('error');
+    }
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-20 text-center text-ink/50">
+        ตะกร้าของคุณว่างเปล่า — ไม่สามารถชำระเงินได้
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-8">
-      <header>
-        <h1 className="text-3xl font-black text-[#2D3748]">ชำระเงิน</h1>
-        <p className="text-slate-500 font-medium">กรุณาตรวจสอบข้อมูลการจัดส่งและการชำระเงิน</p>
-      </header>
-
-      <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-8">
-          {/* Shipping Address */}
-          <section className="rounded-[2.5rem] bg-white p-8 shadow-sm border border-slate-50">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-xl font-black text-[#2D3748]">ที่อยู่จัดส่ง</h2>
-              <button className="text-sm font-bold text-[#4FD1C5] hover:underline">+ เพิ่มที่อยู่ใหม่</button>
-            </div>
-            <div className="rounded-3xl border-2 border-[#4FD1C5] bg-teal-50/30 p-6">
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <p className="font-black text-[#2D3748]">สมชาย ใจดี (บ้าน)</p>
-                  <p className="text-sm text-slate-600">123/45 หมู่บ้านสุขใจ ถ.สุขุมวิท แขวงคลองเตย</p>
-                  <p className="text-sm text-slate-600">เขตคลองเตย กรุงเทพฯ 10110</p>
-                  <p className="text-sm text-slate-600">โทร: 081-234-5678</p>
-                </div>
-                <span className="rounded-full bg-[#4FD1C5] px-3 py-1 text-[10px] font-black text-white">ค่าเริ่มต้น</span>
-              </div>
-            </div>
-          </section>
-
-          {/* Payment Method */}
-          <section className="rounded-[2.5rem] bg-white p-8 shadow-sm border border-slate-50">
-            <h2 className="mb-6 text-xl font-black text-[#2D3748]">ช่องทางการชำระเงิน</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { name: 'บัตรเครดิต', icon: '💳' },
-                { name: 'QR PromptPay', icon: '📱' },
-                { name: 'โอนเงินธนาคาร', icon: '🏦' },
-              ].map((method, i) => (
-                <div key={method.name} className={`cursor-pointer rounded-2xl border-2 p-4 text-center transition-all ${i === 1 ? 'border-[#4FD1C5] bg-teal-50/30' : 'border-slate-100 hover:border-slate-200'}`}>
-                  <span className="text-2xl mb-2 block">{method.icon}</span>
-                  <span className="text-sm font-bold text-[#2D3748]">{method.name}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* VelRepeat Option */}
-          <section className="rounded-[2.5rem] bg-[#2D3748] p-8 shadow-xl text-white">
-            <div className="flex items-center gap-4 mb-6">
-               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#4FD1C5] text-2xl shadow-lg shadow-teal-500/20">🔄</div>
-               <div>
-                  <h2 className="text-xl font-black">เปิดใช้งาน VelRepeat</h2>
-                  <p className="text-sm text-slate-400">สั่งซื้อรายการนี้ซ้ำโดยอัตโนมัติ</p>
-               </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-               {['ทุกสัปดาห์', 'ทุก 2 สัปดาห์', 'ทุกเดือน'].map((freq) => (
-                 <button key={freq} className="rounded-2xl border border-white/10 bg-white/5 py-3 text-sm font-bold hover:bg-white/10 transition-all">
-                    {freq}
-                 </button>
-               ))}
-            </div>
-          </section>
-        </div>
-
-        {/* Order Review */}
-        <aside>
-          <div className="rounded-[2.5rem] bg-white p-8 shadow-xl border border-slate-50 sticky top-28">
-            <h2 className="mb-6 text-xl font-black text-[#2D3748]">ตรวจสอบรายการ</h2>
-            <div className="mb-6 space-y-4">
-               <div className="flex justify-between text-sm">
-                  <span className="text-slate-500 font-medium">ข้าวหอมมะลิ x2</span>
-                  <span className="font-bold text-[#2D3748]">฿490</span>
-               </div>
-               <div className="flex justify-between text-sm">
-                  <span className="text-slate-500 font-medium">น้ำแร่ธรรมชาติ x1</span>
-                  <span className="font-bold text-[#2D3748]">฿120</span>
-               </div>
-            </div>
-            <div className="space-y-3 border-t border-slate-100 pt-6 text-sm">
-              <div className="flex justify-between text-slate-500 font-medium">
-                <span>ยอดรวม</span>
-                <span>฿610</span>
-              </div>
-              <div className="flex justify-between text-slate-500 font-medium">
-                <span>ค่าจัดส่ง</span>
-                <span>฿50</span>
-              </div>
-              <div className="flex justify-between pt-4">
-                <span className="text-lg font-black text-[#2D3748]">ยอดสุทธิ</span>
-                <span className="text-2xl font-black text-[#4FD1C5]">฿660</span>
-              </div>
-            </div>
-            <button className="mt-8 w-full rounded-2xl bg-[#4FD1C5] py-4 text-lg font-black text-white shadow-xl shadow-teal-100 transition-all hover:bg-[#319795] active:scale-95">
-              ยืนยันคำสั่งซื้อ
-            </button>
+    <div className="mx-auto max-w-4xl px-4 py-10">
+      <h1 className="mb-6 font-display text-2xl font-bold text-ink">ชำระเงิน</h1>
+      <div className="grid gap-8 sm:grid-cols-3">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:col-span-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink/50">ที่อยู่จัดส่ง</h2>
+          <Input
+            label="ชื่อผู้รับ"
+            required
+            value={form.recipientName}
+            onChange={(e) => setForm({ ...form, recipientName: e.target.value })}
+          />
+          <Input
+            label="เบอร์โทรศัพท์"
+            required
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          />
+          <Input
+            label="ที่อยู่"
+            required
+            value={form.addressLine}
+            onChange={(e) => setForm({ ...form, addressLine: e.target.value })}
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="เขต/อำเภอ"
+              required
+              value={form.city}
+              onChange={(e) => setForm({ ...form, city: e.target.value })}
+            />
+            <Input
+              label="จังหวัด"
+              required
+              value={form.province}
+              onChange={(e) => setForm({ ...form, province: e.target.value })}
+            />
           </div>
-        </aside>
+          <Input
+            label="รหัสไปรษณีย์"
+            required
+            value={form.postalCode}
+            onChange={(e) => setForm({ ...form, postalCode: e.target.value })}
+          />
+          {error && <p className="text-sm text-brick">{error}</p>}
+          <Button type="submit" isLoading={status === 'loading'} className="mt-2">
+            ยืนยันคำสั่งซื้อ
+          </Button>
+        </form>
+
+        <div className="h-fit rounded-lg border border-line bg-white p-5" style={{ borderLeft: '3px solid #0B4F4A' }}>
+          <div className="text-xs font-semibold uppercase tracking-wide text-ink/50">สรุปคำสั่งซื้อ</div>
+          <div className="mt-3 flex flex-col gap-1.5 text-sm">
+            {items.map((item) => (
+              <div key={item.id} className="flex justify-between">
+                <span className="text-ink/60">
+                  {item.product.name} × {item.quantity}
+                </span>
+                <span className="font-mono">{formatCurrency(Number(item.price) * item.quantity)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="receipt-divider my-3" />
+          <div className="flex justify-between text-sm">
+            <span className="text-ink/60">ยอดรวมสินค้า</span>
+            <span className="font-mono">{formatCurrency(subtotal)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-ink/60">ค่าจัดส่ง</span>
+            <span className="font-mono">{formatCurrency(SHIPPING_FEE)}</span>
+          </div>
+          <div className="receipt-divider my-3" />
+          <div className="flex justify-between font-mono text-base font-semibold text-teal">
+            <span>รวมทั้งหมด</span>
+            <span>{formatCurrency(total)}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { useAuthStore } from '@/stores/auth-store';
+import { getAccessToken } from '@/lib/api-client';
+import { useAuth } from '@/hooks/use-auth';
 
 interface AuthContextValue {
   isInitializing: boolean;
@@ -11,12 +12,17 @@ const AuthContext = createContext<AuthContextValue>({ isInitializing: true });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isInitializing, setIsInitializing] = useState(true);
-  const clearUser = useAuthStore((state) => state.clearUser);
+  const { refreshProfile } = useAuth();
 
   useEffect(() => {
-    clearUser();
-    setIsInitializing(false);
-  }, [clearUser]);
+    const token = getAccessToken();
+    if (!token) {
+      setIsInitializing(false);
+      return;
+    }
+    refreshProfile().finally(() => setIsInitializing(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return <AuthContext.Provider value={{ isInitializing }}>{children}</AuthContext.Provider>;
 }

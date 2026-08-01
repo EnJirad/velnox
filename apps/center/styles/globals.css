@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-ink: #12231F;
+  --color-canvas: #F7F4EC;
+}
+
 body {
-  @apply bg-slate-50 text-slate-900;
+  @apply bg-canvas text-ink antialiased;
+}
+
+::selection {
+  background-color: #E8A33D;
+  color: #12231F;
+}
+
+.receipt-divider {
+  background-image: repeating-linear-gradient(90deg, #C9C2A8 0 6px, transparent 6px 12px);
+  height: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

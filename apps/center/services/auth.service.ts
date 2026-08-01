@@ -1,4 +1,4 @@
-import { apiClient, setAccessToken } from '@/lib/api-client';
+import { apiClient, setTokens } from '@/lib/api-client';
 import type { AuthenticatedUser } from '@velnox/types';
 
 export const authService = {
@@ -6,13 +6,19 @@ export const authService = {
     return apiClient.post<AuthenticatedUser>('/auth/login', payload, { skipAuth: true });
   },
 
-  refresh(refreshToken: string) {
-    return apiClient.post<AuthenticatedUser>('/auth/refresh', { refreshToken }, { skipAuth: true });
+  async logout() {
+    try {
+      await apiClient.post('/auth/logout');
+    } finally {
+      setTokens(null, null);
+    }
   },
 
-  logout() {
-    return apiClient.post<{ success: boolean }>('/auth/logout');
+  me() {
+    return apiClient.get('/users/profile');
   },
 
-  setSessionToken: setAccessToken,
+  persistSession(result: AuthenticatedUser) {
+    setTokens(result.accessToken, result.refreshToken);
+  },
 };

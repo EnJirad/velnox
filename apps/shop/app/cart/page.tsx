@@ -1,92 +1,131 @@
+'use client';
+
 import Link from 'next/link';
+import { useEffect } from 'react';
+import { useCartStore } from '@/stores/cart-store';
+import { useAuth } from '@/hooks/use-auth';
+import { Button, EmptyState } from '@velnox/ui';
+import { formatCurrency } from '@velnox/utils';
 
 export default function CartPage() {
-  const cartItems = [
-    { id: '1', name: 'ข้าวหอมมะลิคัดพิเศษ 5kg', price: 245, quantity: 2, image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?q=80&w=500', shop: 'Velnox Shop' },
-    { id: '2', name: 'น้ำแร่ธรรมชาติแพ็ค 12', price: 120, quantity: 1, image: 'https://images.unsplash.com/photo-1548919973-5cfe5d4fc494?q=80&w=500', shop: 'Velnox Shop' },
-  ];
+  const { isAuthenticated } = useAuth();
+  const { items, isLoading, fetchCart, updateItem, removeItem } = useCartStore();
 
-  const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const shipping = 50;
-  const total = subtotal + shipping;
+  useEffect(() => {
+    if (isAuthenticated) fetchCart();
+  }, [isAuthenticated, fetchCart]);
+
+  const subtotal = items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-16">
+        <EmptyState
+          title="เข้าสู่ระบบเพื่อดูตะกร้าของคุณ"
+          description="ตะกร้าสินค้าจะถูกบันทึกไว้กับบัญชีของคุณ"
+          action={
+            <Link href="/login?next=/cart">
+              <Button>เข้าสู่ระบบ</Button>
+            </Link>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-8">
-      <header>
-        <h1 className="text-3xl font-black text-[#2D3748]">ตะกร้าสินค้าของคุณ</h1>
-        <p className="text-slate-500 font-medium">มีสินค้าทั้งหมด {cartItems.length} รายการในตะกร้า</p>
-      </header>
+    <div className="mx-auto max-w-4xl px-4 py-10">
+      <h1 className="mb-6 font-display text-2xl font-bold text-ink">ตะกร้าสินค้า</h1>
 
-      <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
-        {/* Cart Items List */}
-        <div className="lg:col-span-2 space-y-6">
-          {cartItems.map((item) => (
-            <div key={item.id} className="flex flex-col sm:flex-row items-center gap-6 rounded-[2rem] bg-white p-6 shadow-sm border border-slate-50 transition-all hover:shadow-md">
-              <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-slate-50">
-                <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
-              </div>
-              <div className="flex flex-1 flex-col gap-1">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.shop}</p>
-                <h3 className="text-lg font-bold text-[#2D3748]">{item.name}</h3>
-                <p className="text-[#4FD1C5] font-black">฿{item.price}</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center rounded-xl border border-slate-200 p-1">
-                  <button className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-slate-50">-</button>
-                  <span className="w-8 text-center text-sm font-bold">{item.quantity}</span>
-                  <button className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-slate-50">+</button>
+      {isLoading && items.length === 0 ? (
+        <p className="text-ink/50">กำลังโหลด...</p>
+      ) : items.length === 0 ? (
+        <EmptyState
+          title="ตะกร้าของคุณว่างเปล่า"
+          description="เลือกดูสินค้าจากร้านค้าอิสระทั่วประเทศ"
+          action={
+            <Link href="/products">
+              <Button>เลือกซื้อสินค้า</Button>
+            </Link>
+          }
+        />
+      ) : (
+        <div className="grid gap-8 sm:grid-cols-3">
+          <div className="flex flex-col gap-4 sm:col-span-2">
+            {items.map((item) => (
+              <div key={item.id} className="flex gap-4 rounded-lg border border-line bg-white p-4">
+                <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md bg-canvas">
+                  {item.product.images?.[0]?.url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.product.images[0].url}
+                      alt={item.product.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-2xl text-ink/15">🛍️</div>
+                  )}
                 </div>
-                <button className="p-2 text-slate-300 hover:text-red-500 transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
+                <div className="flex flex-1 flex-col">
+                  <Link href={`/products/${item.product.slug}`} className="text-sm font-medium text-ink hover:text-teal">
+                    {item.product.name}
+                  </Link>
+                  {item.product.shop?.name && (
+                    <span className="text-xs text-ink/40">{item.product.shop.name}</span>
+                  )}
+                  <div className="mt-auto flex items-center justify-between">
+                    <div className="flex items-center rounded-md border border-line">
+                      <button
+                        className="px-2.5 py-1 text-ink/60 hover:text-teal"
+                        onClick={() => updateItem(item.id, Math.max(1, item.quantity - 1))}
+                      >
+                        −
+                      </button>
+                      <span className="w-8 text-center font-mono text-sm">{item.quantity}</span>
+                      <button
+                        className="px-2.5 py-1 text-ink/60 hover:text-teal"
+                        onClick={() => updateItem(item.id, item.quantity + 1)}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <span className="font-mono text-sm font-semibold text-teal">
+                      {formatCurrency(Number(item.price) * item.quantity)}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => removeItem(item.id)}
+                  className="self-start text-xs text-ink/40 hover:text-brick"
+                  aria-label="ลบสินค้า"
+                >
+                  ลบ
                 </button>
               </div>
-            </div>
-          ))}
-          
-          <Link href="/products" className="inline-flex items-center gap-2 text-sm font-bold text-[#4FD1C5] hover:underline mt-4">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-             </svg>
-             เลือกซื้อสินค้าต่อ
-          </Link>
-        </div>
+            ))}
+          </div>
 
-        {/* Order Summary */}
-        <aside className="space-y-6">
-          <div className="rounded-[2.5rem] bg-white p-8 shadow-xl border border-slate-50">
-            <h2 className="mb-6 text-xl font-black text-[#2D3748]">สรุปคำสั่งซื้อ</h2>
-            <div className="space-y-4 text-sm">
-              <div className="flex justify-between font-medium text-slate-600">
-                <span>ยอดรวมสินค้า</span>
-                <span>฿{subtotal}</span>
-              </div>
-              <div className="flex justify-between font-medium text-slate-600">
-                <span>ค่าจัดส่ง</span>
-                <span>฿{shipping}</span>
-              </div>
-              <div className="mt-6 border-t border-slate-100 pt-6 flex justify-between">
-                <span className="text-lg font-black text-[#2D3748]">ยอดสุทธิ</span>
-                <span className="text-2xl font-black text-[#4FD1C5]">฿{total}</span>
-              </div>
+          <div className="h-fit rounded-lg border border-line bg-white p-5" style={{ borderLeft: '3px solid #0B4F4A' }}>
+            <div className="text-xs font-semibold uppercase tracking-wide text-ink/50">สรุปคำสั่งซื้อ</div>
+            <div className="mt-3 flex justify-between text-sm">
+              <span className="text-ink/60">ยอดรวมสินค้า</span>
+              <span className="font-mono">{formatCurrency(subtotal)}</span>
             </div>
-            <Link href="/checkout" className="mt-8 block w-full rounded-2xl bg-[#2D3748] py-4 text-center text-lg font-black text-white shadow-xl transition-all hover:bg-slate-700 active:scale-95">
-              ดำเนินการชำระเงิน
+            <div className="mt-1 flex justify-between text-sm">
+              <span className="text-ink/60">ค่าจัดส่ง</span>
+              <span className="font-mono">คำนวณตอนชำระเงิน</span>
+            </div>
+            <div className="receipt-divider my-3" />
+            <div className="flex justify-between font-mono text-base font-semibold text-teal">
+              <span>รวม</span>
+              <span>{formatCurrency(subtotal)}</span>
+            </div>
+            <Link href="/checkout">
+              <Button className="mt-4 w-full">ดำเนินการชำระเงิน</Button>
             </Link>
           </div>
-
-          <div className="rounded-[2rem] bg-[#E6FFFA] p-8 border border-[#4FD1C5]/20">
-             <div className="flex items-center gap-3 mb-4">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#4FD1C5] text-white text-xs">✓</div>
-                <h4 className="font-black text-[#2D3748] text-sm">รับประกันความปลอดภัย</h4>
-             </div>
-             <p className="text-xs text-[#319795] font-medium leading-relaxed">
-                ข้อมูลการชำระเงินของคุณถูกเข้ารหัสและปกป้องด้วยมาตรฐานความปลอดภัยระดับสูงสุด
-             </p>
-          </div>
-        </aside>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

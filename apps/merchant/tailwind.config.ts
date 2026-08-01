@@ -10,8 +10,25 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary: '#0F766E',
-        secondary: '#F97316',
+        ink: '#12231F',
+        canvas: '#F7F4EC',
+        teal: '#0B4F4A',
+        tealDeep: '#083A36',
+        marigold: '#E8A33D',
+        brick: '#C1502E',
+        line: '#E4DFCF',
+        success: '#2E7D4F',
+        danger: '#C1502E',
+      },
+      fontFamily: {
+        sans: ['var(--font-body)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
+      },
+      borderRadius: {
+        sm: '4px',
+        md: '8px',
+        lg: '14px',
       },
     },
   },

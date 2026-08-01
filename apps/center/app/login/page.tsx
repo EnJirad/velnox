@@ -1,39 +1,55 @@
-export default function AdminLoginPage() {
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button, Input } from '@velnox/ui';
+import { useAuth } from '@/hooks/use-auth';
+
+export default function LoginPage() {
+  const { login } = useAuth();
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    try {
+      await login(email, password);
+      router.push('/admin');
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-800 p-8 shadow-2xl">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-white font-bold text-xl">VC</div>
-          <h1 className="text-2xl font-bold text-white">VelCenter Admin</h1>
-          <p className="mt-2 text-slate-400">ระบบบริหารจัดการกลาง Velnox Platform</p>
-        </div>
-        <form className="flex flex-col gap-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-300">รหัสพนักงาน / อีเมล</label>
-            <input
-              type="text"
-              placeholder="admin@velnox.dev"
-              className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-900"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-300">รหัสผ่านปลอดภัย</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-900"
-            />
-          </div>
-          <button className="mt-2 w-full rounded-lg bg-blue-600 py-2.5 font-bold text-white transition-colors hover:bg-blue-700">
-            ยืนยันตัวตนเข้าสู่ระบบ
-          </button>
+    <div className="flex min-h-screen items-center justify-center bg-ink px-4">
+      <div className="w-full max-w-sm rounded-lg border border-white/10 bg-white p-6">
+        <h1 className="font-display text-xl font-bold text-ink">เข้าสู่ระบบผู้ดูแล</h1>
+        <p className="mt-1 text-sm text-ink/60">สำหรับทีมงาน Velnox เท่านั้น</p>
+
+        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+          <Input label="อีเมล" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Input
+            label="รหัสผ่าน"
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          {error && <p className="text-sm text-brick">{error}</p>}
+          <Button type="submit" isLoading={isLoading}>
+            เข้าสู่ระบบ
+          </Button>
         </form>
-        <div className="mt-8 text-center">
-          <p className="text-xs text-slate-500">
-            ระบบมีการบันทึกการเข้าใช้งานทั้งหมด <br />
-            การเข้าถึงโดยไม่ได้รับอนุญาตจะถูกดำเนินคดีตามกฎหมาย
-          </p>
-        </div>
+        <p className="mt-4 text-center text-xs text-ink/40">
+          ทดลองใช้: admin@velnox.dev / Admin@12345
+        </p>
       </div>
     </div>
   );

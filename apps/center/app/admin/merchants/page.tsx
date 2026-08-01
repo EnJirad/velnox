@@ -1,99 +1,131 @@
-export default function AdminMerchantsPage() {
-  const merchants = [
-    { id: 'M-101', name: 'Fresh Organic Farm', owner: 'สมเกียรติ มั่นคง', status: 'PENDING', date: '2026-07-31', rating: '-' },
-    { id: 'M-102', name: 'Gadget World', owner: 'วิชัย เทค', status: 'APPROVED', date: '2026-07-28', rating: '4.8' },
-    { id: 'M-103', name: 'Home Decor Studio', owner: 'อริสา แต่งบ้าน', status: 'APPROVED', date: '2026-07-25', rating: '4.5' },
-    { id: 'M-104', name: 'Pet Paradise', owner: 'นพดล รักสัตว์', status: 'SUSPENDED', date: '2026-07-20', rating: '3.2' },
-  ];
+'use client';
+
+import { useEffect, useState } from 'react';
+import { Badge, Button, EmptyState } from '@velnox/ui';
+import { formatDate } from '@velnox/utils';
+import { adminService } from '@/services/admin.service';
+
+interface Merchant {
+  id: string;
+  status: string;
+  createdAt: string;
+  user: { name: string; email: string };
+  shops: { name: string; description: string | null }[];
+}
+
+const STATUS_TONE: Record<string, 'neutral' | 'teal' | 'marigold' | 'brick' | 'success'> = {
+  PENDING: 'marigold',
+  APPROVED: 'success',
+  REJECTED: 'brick',
+  SUSPENDED: 'brick',
+};
+
+export default function MerchantsPage() {
+  const [merchants, setMerchants] = useState<Merchant[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [actingId, setActingId] = useState<string | null>(null);
+
+  function load() {
+    setIsLoading(true);
+    adminService.merchants
+      .list()
+      .then((data) => setMerchants(data as Merchant[]))
+      .finally(() => setIsLoading(false));
+  }
+
+  useEffect(load, []);
+
+  async function handleApprove(id: string) {
+    setActingId(id);
+    try {
+      await adminService.merchants.approve(id);
+      load();
+    } finally {
+      setActingId(null);
+    }
+  }
+
+  async function handleReject(id: string) {
+    setActingId(id);
+    try {
+      await adminService.merchants.reject(id);
+      load();
+    } finally {
+      setActingId(null);
+    }
+  }
+
+  const pending = merchants.filter((m) => m.status === 'PENDING');
+  const others = merchants.filter((m) => m.status !== 'PENDING');
 
   return (
-    <div className="flex flex-col gap-8 p-6 lg:p-10">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-black text-[#2D3748]">จัดการร้านค้า</h1>
-          <p className="text-slate-500 font-medium">ตรวจสอบ อนุมัติ และติดตามประสิทธิภาพของร้านค้าพาร์ทเนอร์</p>
-        </div>
-        <div className="flex gap-3">
-          <button className="rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-[#2D3748] shadow-sm hover:bg-slate-50">
-            รายงานร้านค้า
-          </button>
-        </div>
-      </header>
+    <div>
+      <h1 className="font-display text-2xl font-bold text-ink">ผู้ขาย</h1>
+      <p className="mt-1 text-sm text-ink/60">อนุมัติคำขอเปิดร้านค้าใหม่ และดูสถานะผู้ขายทั้งหมด</p>
 
-      {/* Stats for Merchants */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-         {[
-           { label: 'ร้านค้าทั้งหมด', value: '1,240', color: 'bg-blue-50 text-blue-600' },
-           { label: 'รอการอนุมัติ', value: '12', color: 'bg-orange-50 text-orange-600' },
-           { label: 'ร้านค้าที่ถูกระงับ', value: '5', color: 'bg-red-50 text-red-500' },
-         ].map((stat) => (
-           <div key={stat.label} className="rounded-[2rem] bg-white p-6 shadow-sm border border-slate-50">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
-              <h3 className={`mt-2 text-2xl font-black ${stat.color.split(' ')[1]}`}>{stat.value}</h3>
-           </div>
-         ))}
-      </div>
-
-      {/* Merchant Table */}
-      <section className="rounded-[2.5rem] bg-white p-8 shadow-sm border border-slate-50">
-        <div className="mb-8 flex items-center justify-between">
-           <div className="relative flex-1 max-w-md">
-              <input 
-                type="text" 
-                placeholder="ค้นหาร้านค้า หรือชื่อเจ้าของ..." 
-                className="w-full rounded-xl border border-slate-100 bg-slate-50 px-4 py-2 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-teal-50"
-              />
-           </div>
+      <h2 className="mb-3 mt-8 text-sm font-semibold uppercase tracking-wide text-ink/50">
+        รออนุมัติ ({pending.length})
+      </h2>
+      {isLoading ? (
+        <p className="text-sm text-ink/50">กำลังโหลด...</p>
+      ) : pending.length === 0 ? (
+        <EmptyState title="ไม่มีคำขอรออนุมัติ" />
+      ) : (
+        <div className="flex flex-col gap-3">
+          {pending.map((merchant) => (
+            <div key={merchant.id} className="flex items-center justify-between rounded-lg border border-line bg-white p-4">
+              <div>
+                <div className="font-medium text-ink">{merchant.shops[0]?.name}</div>
+                <div className="text-xs text-ink/50">
+                  {merchant.user.name} · {merchant.user.email} · สมัครเมื่อ {formatDate(merchant.createdAt)}
+                </div>
+                {merchant.shops[0]?.description && (
+                  <p className="mt-1 max-w-md text-sm text-ink/60">{merchant.shops[0].description}</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  disabled={actingId === merchant.id}
+                  onClick={() => handleReject(merchant.id)}
+                >
+                  ปฏิเสธ
+                </Button>
+                <Button
+                  isLoading={actingId === merchant.id}
+                  onClick={() => handleApprove(merchant.id)}
+                >
+                  อนุมัติ
+                </Button>
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                <th className="pb-4 pl-4">ร้านค้า / เจ้าของ</th>
-                <th className="pb-4">วันที่ลงทะเบียน</th>
-                <th className="pb-4">คะแนน</th>
-                <th className="pb-4">สถานะ</th>
-                <th className="pb-4 pr-4 text-right">การจัดการ</th>
+      )}
+
+      <h2 className="mb-3 mt-10 text-sm font-semibold uppercase tracking-wide text-ink/50">ผู้ขายทั้งหมด</h2>
+      <div className="overflow-hidden rounded-lg border border-line bg-white">
+        <table className="w-full text-sm">
+          <thead className="border-b border-line bg-canvas text-left text-xs uppercase tracking-wide text-ink/50">
+            <tr>
+              <th className="px-4 py-3 font-medium">ร้านค้า</th>
+              <th className="px-4 py-3 font-medium">เจ้าของ</th>
+              <th className="px-4 py-3 font-medium">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {others.map((merchant) => (
+              <tr key={merchant.id}>
+                <td className="px-4 py-3 font-medium text-ink">{merchant.shops[0]?.name}</td>
+                <td className="px-4 py-3 text-ink/60">{merchant.user.email}</td>
+                <td className="px-4 py-3">
+                  <Badge tone={STATUS_TONE[merchant.status] ?? 'neutral'}>{merchant.status}</Badge>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50 text-sm">
-              {merchants.map((merchant) => (
-                <tr key={merchant.id} className="group transition-colors hover:bg-slate-50/50">
-                  <td className="py-5 pl-4">
-                     <div>
-                        <p className="font-bold text-[#2D3748]">{merchant.name}</p>
-                        <p className="text-xs text-slate-400 font-medium">{merchant.owner}</p>
-                     </div>
-                  </td>
-                  <td className="py-5 font-medium text-slate-500">{merchant.date}</td>
-                  <td className="py-5 font-black text-[#2D3748]">{merchant.rating}</td>
-                  <td className="py-5">
-                    <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${
-                      merchant.status === 'APPROVED' ? 'bg-teal-50 text-[#319795]' : 
-                      merchant.status === 'PENDING' ? 'bg-orange-50 text-orange-600' : 
-                      'bg-red-50 text-red-500'
-                    }`}>
-                      {merchant.status}
-                    </span>
-                  </td>
-                  <td className="py-5 pr-4 text-right">
-                    <div className="flex justify-end gap-2">
-                       {merchant.status === 'PENDING' ? (
-                         <>
-                           <button className="rounded-xl bg-[#4FD1C5] px-3 py-1.5 text-xs font-black text-white hover:bg-[#319795]">อนุมัติ</button>
-                           <button className="rounded-xl bg-white border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-red-50 hover:text-red-500">ปฏิเสธ</button>
-                         </>
-                       ) : (
-                         <button className="rounded-xl bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100">ดูรายละเอียด</button>
-                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

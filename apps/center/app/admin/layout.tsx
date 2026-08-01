@@ -1,10 +1,10 @@
 import { AdminLayout } from '@/components/layout/admin-layout';
-import { RoleGuard } from '@/components/providers/role-guard';
+import { AdminGuard } from '@/components/providers/admin-guard';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <RoleGuard allow={['ADMIN', 'SUPER_ADMIN']}>
+    <AdminGuard>
       <AdminLayout>{children}</AdminLayout>
-    </RoleGuard>
+    </AdminGuard>
   );
 }
