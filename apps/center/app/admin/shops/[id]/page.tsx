@@ -12,6 +12,7 @@ import {
   shopStatusLabel,
   shopStatusTone,
 } from '@/lib/order-status';
+import { useLanguage } from '@/components/providers/language-provider';
 import type { ProductStatus, ShopStatus } from '@velnox/types';
 
 type ShopProduct = {
@@ -42,6 +43,7 @@ type ShopDetail = {
 export default function ShopDetailPage() {
   const params = useParams();
   const id = String(params.id ?? '');
+  const { t } = useLanguage();
 
   const [shop, setShop] = useState<ShopDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,25 +51,30 @@ export default function ShopDetailPage() {
 
   useEffect(() => {
     if (!id) return;
+    setLoading(true);
     apiClient
       .get<ShopDetail>(`/shops/${id}`)
       .then(setShop)
-      .catch((err) => setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ'))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : t('admin.shopNotFound')),
+      )
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, t]);
 
   if (loading) {
-    return <div className="py-20 text-center text-sm text-slate-400">กำลังโหลด...</div>;
+    return (
+      <div className="py-20 text-center text-sm text-slate-400">{t('common.loading')}</div>
+    );
   }
 
   if (error || !shop) {
     return (
       <div className="flex flex-col gap-4">
         <Link href="/admin/shops" className="text-sm font-medium text-teal-700 hover:underline">
-          ← กลับหน้าร้านค้า
+          ← {t('admin.backToShops')}
         </Link>
         <div className="rounded-lg bg-red-50 p-6 text-center text-red-600">
-          {error || 'ไม่พบร้านค้า'}
+          {error || t('admin.shopNotFound')}
         </div>
       </div>
     );
@@ -81,11 +88,11 @@ export default function ShopDetailPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Link href="/admin/shops" className="text-xs font-medium text-teal-700 hover:underline">
-            ← กลับหน้าร้านค้า
+            ← {t('admin.backToShops')}
           </Link>
           <h1 className="mt-2 text-xl font-semibold text-slate-900">{shop.name}</h1>
           <p className="mt-1 text-sm text-slate-500">
-            {shop.description || 'ไม่มีคำอธิบายร้าน'}
+            {shop.description || '—'}
           </p>
         </div>
         <Badge tone={shopStatusTone[shop.status] ?? 'neutral'}>
@@ -95,20 +102,20 @@ export default function ShopDetailPage() {
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs text-slate-500">จำนวนสินค้า</p>
+          <p className="text-xs text-slate-500">{t('admin.productCount')}</p>
           <p className="mt-1 text-2xl font-bold text-slate-900">
-            {totalProducts.toLocaleString('th-TH')}
+            {totalProducts.toLocaleString()}
           </p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs text-slate-500">เจ้าของร้าน</p>
+          <p className="text-xs text-slate-500">{t('admin.owner')}</p>
           <p className="mt-1 text-sm font-semibold text-slate-900">
             {shop.merchant?.user?.name ?? '—'}
           </p>
           <p className="text-xs text-slate-400">{shop.merchant?.user?.email}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs text-slate-500">สถานะ Merchant</p>
+          <p className="text-xs text-slate-500">{t('admin.merchantStatus')}</p>
           <p className="mt-1 text-sm font-semibold text-slate-900">
             {shop.merchant?.status ?? '—'}
           </p>
@@ -117,23 +124,23 @@ export default function ShopDetailPage() {
 
       <div>
         <h2 className="mb-3 text-sm font-semibold text-slate-900">
-          สินค้าในร้าน ({products.length})
+          {t('admin.productsInShop')} ({products.length})
         </h2>
 
         {products.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-sm text-slate-500">
-            ร้านนี้ยังไม่มีสินค้า
+            {t('admin.noProductsInShop')}
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs text-slate-500">
-                  <th className="px-4 py-3 font-medium">สินค้า</th>
+                  <th className="px-4 py-3 font-medium">{t('admin.products')}</th>
                   <th className="px-4 py-3 font-medium">หมวดหมู่</th>
                   <th className="px-4 py-3 font-medium">ราคา</th>
                   <th className="px-4 py-3 font-medium">สต็อก</th>
-                  <th className="px-4 py-3 font-medium">สถานะ</th>
+                  <th className="px-4 py-3 font-medium">{t('admin.colStatus')}</th>
                 </tr>
               </thead>
               <tbody>

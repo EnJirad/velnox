@@ -357,7 +357,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               <IconMenu />
             </button>
             <div>
-              <p className="text-sm font-semibold text-slate-900">แผงควบคุมผู้ดูแลระบบ</p>
+              <p className="text-sm font-semibold text-slate-900">{t('admin.panelTitle')}</p>
               <p className="hidden text-xs text-slate-400 sm:block">Velnox Platform Operations</p>
             </div>
           </div>
@@ -383,20 +383,22 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               {notiOpen && (
                 <div className="absolute right-0 z-50 mt-2 w-[min(100vw-2rem,22rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
                   <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                    <p className="text-sm font-semibold text-slate-900">การแจ้งเตือน</p>
+                    <p className="text-sm font-semibold text-slate-900">{t('admin.notifications')}</p>
                     {notifications.length > 0 && (
                       <button
                         type="button"
                         onClick={markAllRead}
                         className="text-xs font-medium text-teal-700 hover:underline"
                       >
-                        อ่านทั้งหมด
+                        {t('admin.markAllRead')}
                       </button>
                     )}
                   </div>
                   <div className="max-h-80 overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <p className="px-4 py-8 text-center text-sm text-slate-400">ไม่มีการแจ้งเตือน</p>
+                      <p className="px-4 py-8 text-center text-sm text-slate-400">
+                        {t('admin.noNotifications')}
+                      </p>
                     ) : (
                       notifications.map((n) => {
                         const unread = !readIds.has(n.id) && !n.readAt;
@@ -418,7 +420,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                             <p className="text-sm font-medium text-slate-900">{n.title}</p>
                             <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{n.message}</p>
                             <p className="mt-1 text-[11px] text-slate-400">
-                              {new Date(n.createdAt).toLocaleString('th-TH')}
+                              {new Date(n.createdAt).toLocaleString()}
                             </p>
                           </Link>
                         );

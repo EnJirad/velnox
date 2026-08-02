@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Badge } from '@velnox/ui';
 import { apiClient } from '@/lib/api-client';
 import { shopStatusLabel, shopStatusTone } from '@/lib/order-status';
+import { useLanguage } from '@/components/providers/language-provider';
 import type { ShopStatus } from '@velnox/types';
 
 type ApiShop = {
@@ -20,6 +21,7 @@ type ApiShop = {
 };
 
 export default function ShopsPage() {
+  const { t } = useLanguage();
   const [shops, setShops] = useState<ApiShop[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,16 +30,18 @@ export default function ShopsPage() {
     apiClient
       .get<ApiShop[]>('/shops')
       .then(setShops)
-      .catch((err) => setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ'))
+      .catch((err) => setError(err instanceof Error ? err.message : t('common.loading')))
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">หน้าร้านค้าทั้งหมด</h1>
+        <h1 className="text-xl font-semibold text-slate-900">{t('admin.shopsTitle')}</h1>
         <p className="text-sm text-slate-500">
-          {loading ? 'กำลังโหลด...' : `${shops.length} ร้านบน VelShop`}
+          {loading
+            ? t('common.loading')
+            : `${shops.length} ${t('admin.shopsSubtitle')}`}
         </p>
       </div>
 
@@ -46,10 +50,10 @@ export default function ShopsPage() {
       )}
 
       {loading ? (
-        <div className="py-16 text-center text-sm text-slate-400">กำลังโหลด...</div>
+        <div className="py-16 text-center text-sm text-slate-400">{t('common.loading')}</div>
       ) : shops.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center text-sm text-slate-500">
-          ยังไม่มีร้านค้าในระบบ
+          {t('admin.noShops')}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -71,23 +75,21 @@ export default function ShopsPage() {
 
                 <p className="text-sm font-semibold text-slate-900">{s.name}</p>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  เจ้าของ: {s.merchant?.user?.name ?? '—'}
+                  {t('admin.owner')}: {s.merchant?.user?.name ?? '—'}
                 </p>
                 <p className="mt-2 line-clamp-2 text-xs text-slate-500">
-                  {s.description || 'ไม่มีคำอธิบาย'}
+                  {s.description || '—'}
                 </p>
 
-                <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-medium text-slate-700">
-                    {productCount.toLocaleString('th-TH')} สินค้า
-                  </span>
+                <div className="mt-3 text-xs font-medium text-slate-700">
+                  {productCount.toLocaleString()} {t('admin.productCount')}
                 </div>
 
                 <Link
                   href={`/admin/shops/${s.id}`}
                   className="mt-4 block w-full rounded-md border border-slate-300 py-1.5 text-center text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
-                  ดูรายละเอียดร้านค้า
+                  {t('admin.viewShop')}
                 </Link>
               </div>
             );
