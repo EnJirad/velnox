@@ -42,48 +42,58 @@ export class AnalyticsService {
   }
 
   async getRevenueChart() {
-      const since = new Date();
-      since.setMonth(since.getMonth() - 5);
-      since.setDate(1);
-      since.setHours(0, 0, 0, 0);
-    
-      const orders = await this.prisma.order.findMany({
-        where: {
-          paymentStatus: 'PAID',
-          createdAt: { gte: since },
-        },
-        select: { total: true, createdAt: true },
-      });
-    
-      const monthLabels = [
-        'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
-        'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
-      ];
-      const buckets = new Map<string, number>();
-    
-      for (let i = 0; i < 6; i++) {
-        const d = new Date(since);
-        d.setMonth(since.getMonth() + i);
-        const key = `\( {d.getFullYear()}- \){d.getMonth()}`;  // ← แก้ตรงนี้
-        buckets.set(key, 0);
-      }
-    
-      for (const order of orders) {
-        const d = new Date(order.createdAt);
-        const key = `\( {d.getFullYear()}- \){d.getMonth()}`;  // ← แก้ตรงนี้
-        if (buckets.has(key)) {
-          buckets.set(key, (buckets.get(key) ?? 0) + Number(order.total));
-        }
-      }
-    
-      return [...buckets.entries()].map(([key, amount]) => {
-        const monthIndex = Number(key.split('-')[1]);
-        return {
-          month: monthLabels[monthIndex] ?? key,
-          amount: Math.round((amount / 1_000_000) * 100) / 100,
-        };
-      });
+    const since = new Date();
+    since.setMonth(since.getMonth() - 5);
+    since.setDate(1);
+    since.setHours(0, 0, 0, 0);
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        paymentStatus: 'PAID',
+        createdAt: { gte: since },
+      },
+      select: { total: true, createdAt: true },
+    });
+
+    const monthLabels = [
+      'ม.ค.',
+      'ก.พ.',
+      'มี.ค.',
+      'เม.ย.',
+      'พ.ค.',
+      'มิ.ย.',
+      'ก.ค.',
+      'ส.ค.',
+      'ก.ย.',
+      'ต.ค.',
+      'พ.ย.',
+      'ธ.ค.',
+    ];
+    const buckets = new Map<string, number>();
+
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(since);
+      d.setMonth(since.getMonth() + i);
+      const key = `\( {d.getFullYear()}- \){d.getMonth()}`;
+      buckets.set(key, 0);
     }
+
+    for (const order of orders) {
+      const d = new Date(order.createdAt);
+      const key = `\( {d.getFullYear()}- \){d.getMonth()}`;
+      if (buckets.has(key)) {
+        buckets.set(key, (buckets.get(key) ?? 0) + Number(order.total));
+      }
+    }
+
+    return [...buckets.entries()].map(([key, amount]) => {
+      const monthIndex = Number(key.split('-')[1]);
+      return {
+        month: monthLabels[monthIndex] ?? key,
+        amount: Math.round((amount / 1_000_000) * 100) / 100,
+      };
+    });
+  }
 
   async getRecentOrders() {
     return this.prisma.order.findMany({
