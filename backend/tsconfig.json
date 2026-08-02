@@ -2,10 +2,19 @@
   "extends": "../packages/config/tsconfig.nestjs.json",
   "compilerOptions": {
     "baseUrl": "./",
+    "outDir": "./dist",
+    "rootDir": "./src",
     "paths": {
       "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*.ts", "prisma/seed.ts"],
-  "exclude": ["node_modules", "dist", "test"]
+  "include": [
+    "src/**/*.ts",
+    "prisma/seed.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test"
+  ]
 }
