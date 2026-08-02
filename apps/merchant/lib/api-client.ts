@@ -73,7 +73,8 @@ async function refreshAccessToken(): Promise<boolean> {
     return false;
   }
 
-  const data = await response.json();
+  const envelope = await response.json();
+  const data = envelope.data; // Unwrap the TransformInterceptor envelope
   setTokens(data.accessToken, data.refreshToken);
   return true;
 }
@@ -107,7 +108,9 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
     throw new ApiError(await parseErrorMessage(response), response.status);
   }
 
-  return response.json() as Promise<T>;
+  const envelope = await response.json();
+  // Unwrap the TransformInterceptor envelope { data, timestamp }
+  return envelope.data as T;
 }
 
 export const apiClient = {
@@ -138,5 +141,6 @@ export async function uploadImage(
     throw new ApiError(await parseErrorMessage(response), response.status);
   }
 
-  return response.json();
+  const envelope = await response.json();
+  return envelope.data;
 }

@@ -37,7 +37,7 @@ export class AuthService {
       },
     });
 
-    return this.issueTokens(user.id, user.email, user.role);
+    return this.issueTokens(user.id, user.email, user.name, user.role);
   }
 
   async login(dto: LoginDto) {
@@ -55,7 +55,7 @@ export class AuthService {
       throw new UnauthorizedException('Account is not active');
     }
 
-    return this.issueTokens(user.id, user.email, user.role);
+    return this.issueTokens(user.id, user.email, user.name, user.role);
   }
 
   async refresh(refreshToken: string) {
@@ -88,7 +88,7 @@ export class AuthService {
       data: { revoked: true },
     });
 
-    return this.issueTokens(user.id, user.email, user.role);
+    return this.issueTokens(user.id, user.email, user.name, user.role);
   }
 
   async logout(userId: string) {
@@ -111,7 +111,7 @@ export class AuthService {
     return null;
   }
 
-  private async issueTokens(userId: string, email: string, role: string) {
+  private async issueTokens(userId: string, email: string, name: string, role: string) {
     const payload = { sub: userId, email, role };
 
     const accessToken = await this.jwtService.signAsync(payload, {
@@ -135,7 +135,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: { id: userId, email, role },
+      user: { id: userId, email, name, role },
     };
   }
 }
