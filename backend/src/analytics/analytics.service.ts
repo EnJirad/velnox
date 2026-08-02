@@ -6,35 +6,89 @@ export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getPlatformStats() {
+    const now = new Date();
+    const startThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
     const [
       activeUsers,
       activeMerchants,
       pendingMerchants,
-      activeProducts,
+      draftProducts,
       openOrders,
       paidOrders,
       velrepeatActive,
       velrepeatPaused,
+      gmvThisMonth,
+      gmvLastMonth,
+      usersThisMonth,
+      usersLastMonth,
     ] = await Promise.all([
       this.prisma.user.count({ where: { role: 'CUSTOMER', status: 'ACTIVE' } }),
       this.prisma.merchant.count({ where: { status: 'APPROVED' } }),
       this.prisma.merchant.count({ where: { status: 'PENDING' } }),
-      this.prisma.product.count({ where: { status: 'ACTIVE' } }),
-      this.prisma.order.count({ where: { status: { notIn: ['DELIVERED', 'CANCELLED'] } } }),
+      // สินค้ารอตรวจ = DRAFT (schema ไม่มี PENDING_REVIEW)
+      this.prisma.product.count({ where: { status: 'DRAFT' } }),
+      this.prisma.order.count({
+        where: { status: { notIn: ['DELIVERED', 'CANCELLED'] } },
+      }),
       this.prisma.order.aggregate({
         _sum: { total: true },
         where: { paymentStatus: 'PAID' },
       }),
       this.prisma.velRepeatSubscription.count({ where: { status: 'ACTIVE' } }),
       this.prisma.velRepeatSubscription.count({ where: { status: 'PAUSED' } }),
+      this.prisma.order.aggregate({
+        _sum: { total: true },
+        where: {
+          paymentStatus: 'PAID',
+          createdAt: { gte: startThisMonth },
+        },
+      }),
+      this.prisma.order.aggregate({
+        _sum: { total: true },
+        where: {
+          paymentStatus: 'PAID',
+          createdAt: { gte: startLastMonth, lte: endLastMonth },
+        },
+      }),
+      this.prisma.user.count({
+        where: {
+          role: 'CUSTOMER',
+          status: 'ACTIVE',
+          createdAt: { gte: startThisMonth },
+        },
+      }),
+      this.prisma.user.count({
+        where: {
+          role: 'CUSTOMER',
+          status: 'ACTIVE',
+          createdAt: { gte: startLastMonth, lte: endLastMonth },
+        },
+      }),
     ]);
+
+    const gmvThis = Number(gmvThisMonth._sum.total ?? 0);
+    const gmvLast = Number(gmvLastMonth._sum.total ?? 0);
+    const gmvGrowth =
+      gmvLast > 0 ? Math.round(((gmvThis - gmvLast) / gmvLast) * 1000) / 10 : gmvThis > 0 ? 100 : 0;
+
+    const activeUsersGrowth =
+      usersLastMonth > 0
+        ? Math.round(((usersThisMonth - usersLastMonth) / usersLastMonth) * 1000) / 10
+        : usersThisMonth > 0
+          ? 100
+          : 0;
 
     return {
       gmv: Number(paidOrders._sum.total ?? 0),
+      gmvGrowth,
       activeUsers,
+      activeUsersGrowth,
       activeMerchants,
       pendingMerchants,
-      pendingProducts: activeProducts,
+      pendingProducts: draftProducts,
       openOrders,
       velrepeatActive,
       velrepeatPaused,
@@ -105,6 +159,111 @@ export class AnalyticsService {
         },
       },
     });
+  }
+
+  /** แจ้งเตือนสำหรับ VelCenter (Admin) — สร้างจากข้อมูลจริงในระบบ */
+  async getAdminNotifications(userId: string) {
+    const [pendingMerchants, draftProducts, openOrders, dbNotifications] =
+      await Promise.all([
+        this.prisma.merchant.findMany({
+          where: { status: 'PENDING' },
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: { select: { name: true, email: true } },
+            shops: { take: 1, select: { name: true } },
+          },
+        }),
+        this.prisma.product.findMany({
+          where: { status: 'DRAFT' },
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            shop: { select: { name: true } },
+          },
+        }),
+        this.prisma.order.findMany({
+          where: { status: { in: ['PENDING', 'CONFIRMED'] } },
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: { select: { name: true } },
+          },
+        }),
+        this.prisma.notification.findMany({
+          where: { userId },
+          take: 20,
+          orderBy: { createdAt: 'desc' },
+        }),
+      ]);
+
+    type AdminNoti = {
+      id: string;
+      title: string;
+      message: string;
+      type: string;
+      href: string;
+      readAt: string | null;
+      createdAt: Date;
+    };
+
+    const items: AdminNoti[] = [];
+
+    for (const m of pendingMerchants) {
+      const shopName = m.shops[0]?.name ?? m.user.name;
+      items.push({
+        id: `merchant-${m.id}`,
+        title: 'ร้านค้ารออนุมัติ',
+        message: `\( {shopName} ( \){m.user.email}) รอการอนุมัติ`,
+        type: 'MERCHANT_PENDING',
+        href: '/admin/merchants',
+        readAt: null,
+        createdAt: m.createdAt,
+      });
+    }
+
+    for (const p of draftProducts) {
+      items.push({
+        id: `product-${p.id}`,
+        title: 'สินค้ารอตรวจ',
+        message: `${p.name} จากร้าน ${p.shop.name}`,
+        type: 'PRODUCT_DRAFT',
+        href: '/admin/products',
+        readAt: null,
+        createdAt: p.createdAt,
+      });
+    }
+
+    for (const o of openOrders) {
+      items.push({
+        id: `order-${o.id}`,
+        title: 'คำสั่งซื้อใหม่',
+        message: `#${o.orderNumber} จาก \( {o.user.name} — ฿ \){Number(o.total).toLocaleString()}`,
+        type: 'ORDER_NEW',
+        href: '/admin/orders',
+        readAt: null,
+        createdAt: o.createdAt,
+      });
+    }
+
+    for (const n of dbNotifications) {
+      items.push({
+        id: n.id,
+        title: n.title,
+        message: n.message,
+        type: n.type,
+        href: '/admin',
+        readAt: n.readAt ? n.readAt.toISOString() : null,
+        createdAt: n.createdAt,
+      });
+    }
+
+    items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    return {
+      notifications: items.slice(0, 30),
+      unreadCount: items.filter((i) => !i.readAt).length,
+    };
   }
 
   async getMerchantDashboard(userId: string) {

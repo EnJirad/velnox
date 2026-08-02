@@ -26,7 +26,14 @@ export class AnalyticsController {
     return this.analyticsService.getRecentOrders();
   }
 
-  /** VelMerchant dashboard overview (real order + stock data) */
+  /** แจ้งเตือนสำหรับ VelCenter (กระดิ่ง) */
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Get('admin/notifications')
+  getAdminNotifications(@CurrentUser() user: AuthenticatedRequestUser) {
+    return this.analyticsService.getAdminNotifications(user.userId);
+  }
+
+  /** VelMerchant dashboard overview */
   @Roles('MERCHANT')
   @Get('merchant/dashboard')
   getMerchantDashboard(@CurrentUser() user: AuthenticatedRequestUser) {

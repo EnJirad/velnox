@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { formatCurrency, formatDate } from '@velnox/utils';
 import { Badge, Card } from '@velnox/ui';
 import { apiClient } from '@/lib/api-client';
-import { orderStatusLabel, orderStatusTone } from '@/lib/mock-data';
+import { orderStatusLabel, orderStatusTone } from '@/lib/order-status';
 import type { Order } from '@velnox/types';
 
 interface Stats {
