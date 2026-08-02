@@ -74,13 +74,13 @@ export class AnalyticsService {
     for (let i = 0; i < 6; i++) {
       const d = new Date(since);
       d.setMonth(since.getMonth() + i);
-      const key = `\( {d.getFullYear()}- \){d.getMonth()}`;
+      const key = d.getFullYear() + '-' + d.getMonth();
       buckets.set(key, 0);
     }
 
     for (const order of orders) {
       const d = new Date(order.createdAt);
-      const key = `\( {d.getFullYear()}- \){d.getMonth()}`;
+      const key = d.getFullYear() + '-' + d.getMonth();
       if (buckets.has(key)) {
         buckets.set(key, (buckets.get(key) ?? 0) + Number(order.total));
       }
