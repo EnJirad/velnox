@@ -14,10 +14,13 @@ interface ProductFormProps {
 export function ProductForm({ mode, productId, initial }: ProductFormProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const categoryBoxRef = useRef<HTMLDivElement>(null);
 
-  const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [name, setName] = useState(initial?.name ?? '');
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? '');
+  const [categoryQuery, setCategoryQuery] = useState(initial?.category?.name ?? '');
+  const [suggestions, setSuggestions] = useState<ApiCategory[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [description, setDescription] = useState(initial?.description ?? '');
   const [price, setPrice] = useState(initial ? String(initial.price) : '');
   const [stock, setStock] = useState(initial ? String(initial.stock) : '');
@@ -30,12 +33,33 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Search categories while typing (shared tags style)
   useEffect(() => {
-    apiClient.get<ApiCategory[]>('/categories').then((data) => {
-      setCategories(data);
-      if (!categoryId && data.length > 0) setCategoryId(data[0].id);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const q = categoryQuery.trim();
+    if (!q) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      apiClient
+        .get<ApiCategory[]>(`/categories?search=${encodeURIComponent(q)}`)
+        .then((data) => setSuggestions(Array.isArray(data) ? data : []))
+        .catch(() => setSuggestions([]));
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [categoryQuery]);
+
+  // Close suggestion dropdown when clicking outside
+  useEffect(() => {
+    function onPointerDown(e: MouseEvent) {
+      if (categoryBoxRef.current && !categoryBoxRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
   }, []);
 
   async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -58,33 +82,59 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
     setImages((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function selectCategory(cat: ApiCategory) {
+    setCategoryId(cat.id);
+    setCategoryQuery(cat.name);
+    setSuggestions([]);
+    setShowSuggestions(false);
+  }
+
+  /** Reuse existing category or create a shared one by name. */
+  async function resolveCategoryId(): Promise<string> {
+    if (categoryId) return categoryId;
+
+    const trimmed = categoryQuery.trim();
+    if (trimmed.length < 2) {
+      throw new Error('กรุณาระบุหมวดหมู่ (อย่างน้อย 2 ตัวอักษร)');
+    }
+
+    const cat = await apiClient.post<ApiCategory>('/categories/resolve', { name: trimmed });
+    setCategoryId(cat.id);
+    setCategoryQuery(cat.name);
+    return cat.id;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
-    if (!name.trim() || !categoryId || !price || !stock) {
+    if (!name.trim() || !categoryQuery.trim() || !price || !stock) {
       setError('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
     setSaving(true);
     try {
+      const resolvedCategoryId = await resolveCategoryId();
+
       if (mode === 'create') {
         await apiClient.post('/products', {
-          name,
-          categoryId,
-          description: description || undefined,
+          name: name.trim(),
+          categoryId: resolvedCategoryId,
+          description: description.trim() || undefined,
           price: Number(price),
           stock: Number(stock),
           imageUrls: images.map((img) => img.url),
         });
       } else if (productId) {
         await apiClient.patch(`/products/${productId}`, {
-          name,
-          description: description || undefined,
+          name: name.trim(),
+          description: description.trim() || undefined,
           price: Number(price),
           stock: Number(stock),
           status,
+          // category can be updated if backend allows; resolve if user changed it
+          ...(resolvedCategoryId ? { categoryId: resolvedCategoryId } : {}),
         });
       }
       router.push('/dashboard/products');
@@ -114,7 +164,7 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
         <h2 className="mb-4 text-sm font-semibold text-slate-900">รูปภาพสินค้า</h2>
         <div className="flex flex-wrap gap-3">
           {images.map((img, i) => (
@@ -136,13 +186,19 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
             disabled={uploading}
             className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-300 text-xs text-slate-500 hover:border-teal-500 hover:text-teal-700 disabled:opacity-60"
           >
-            {uploading ? '...' : <><span className="text-xl">+</span>เพิ่มรูป</>}
+            {uploading ? (
+              '...'
+            ) : (
+              <>
+                <span className="text-xl">+</span>เพิ่มรูป
+              </>
+            )}
           </button>
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
         <h2 className="mb-4 text-sm font-semibold text-slate-900">ข้อมูลสินค้า</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1 sm:col-span-2">
@@ -151,22 +207,53 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
+              placeholder="เช่น หูฟังไร้สาย"
               className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
             />
           </div>
-          <div className="flex flex-col gap-1">
+
+          <div className="relative flex flex-col gap-1 sm:col-span-2" ref={categoryBoxRef}>
             <label className="text-sm font-medium text-slate-700">หมวดหมู่</label>
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              disabled={mode === 'edit'}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600 disabled:bg-slate-50 disabled:text-slate-400"
-            >
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            <input
+              required
+              value={categoryQuery}
+              onChange={(e) => {
+                setCategoryQuery(e.target.value);
+                setCategoryId('');
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              placeholder="พิมพ์เพื่อค้นหาหรือสร้างหมวดหมู่ เช่น เทคโนโลยี"
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
+              autoComplete="off"
+            />
+            {showSuggestions && categoryQuery.trim().length >= 1 && (
+              <ul className="absolute top-full z-20 mt-1 max-h-52 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
+                {suggestions.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-teal-50"
+                      onClick={() => selectCategory(c)}
+                    >
+                      <span className="text-teal-600">#</span>
+                      <span>{c.name}</span>
+                    </button>
+                  </li>
+                ))}
+                {suggestions.length === 0 && (
+                  <li className="px-3 py-2 text-sm text-slate-500">ไม่พบหมวดหมู่ที่ตรงกัน</li>
+                )}
+                <li className="border-t border-slate-100 px-3 py-2 text-xs text-slate-500">
+                  กดบันทึกเพื่อใช้ “{categoryQuery.trim()}” — ระบบจะใช้หมวดหมู่ที่มีอยู่แล้ว หรือสร้างใหม่ให้แชร์กับร้านอื่น
+                </li>
+              </ul>
+            )}
+            {categoryId && (
+              <p className="text-xs text-teal-700">เลือกแล้ว: #{categoryQuery}</p>
+            )}
           </div>
+
           {mode === 'edit' && (
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-slate-700">สถานะ</label>
@@ -175,11 +262,13 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
                 onChange={(e) => setStatus(e.target.value as ApiProduct['status'])}
                 className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
               >
-                <option value="ACTIVE">เผยแพร่แล้ว</option>
+                <option value="ACTIVE">เผยแพร่แล้ว (ขึ้นบน VelShop)</option>
                 <option value="INACTIVE">ปิดการขาย</option>
+                <option value="DRAFT">ฉบับร่าง</option>
               </select>
             </div>
           )}
+
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-slate-700">ราคา (บาท)</label>
             <input
@@ -192,6 +281,7 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
               className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
             />
           </div>
+
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-slate-700">จำนวนสต็อก</label>
             <input
@@ -203,20 +293,22 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
               className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
             />
           </div>
+
           <div className="flex flex-col gap-1 sm:col-span-2">
             <label className="text-sm font-medium text-slate-700">คำอธิบายสินค้า</label>
             <textarea
               rows={4}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              placeholder="รายละเอียดสินค้า วัสดุ ขนาด ฯลฯ"
               className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
             />
           </div>
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-3">
           <button
             type="submit"
             disabled={saving}
@@ -237,7 +329,7 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
             type="button"
             onClick={handleDelete}
             disabled={deleting}
-            className="text-sm font-medium text-red-600 hover:underline disabled:opacity-60"
+            className="text-left text-sm font-medium text-red-600 hover:underline disabled:opacity-60 sm:text-right"
           >
             {deleting ? 'กำลังลบ...' : 'ลบสินค้านี้'}
           </button>
