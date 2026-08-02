@@ -188,6 +188,15 @@ const en: Dictionary = {
     productsInShop: 'Products in shop',
     noProductsInShop: 'This shop has no products yet',
     merchantStatus: 'Merchant status',
+    // Orders
+    ordersTitle: 'Platform orders',
+    ordersSubtitle: 'All orders across VelShop',
+    ordersCount: 'orders in the system',
+    noOrders: 'No orders yet',
+    colOrder: 'Order',
+    colDate: 'Date',
+    colTotal: 'Total',
+    colPayment: 'Payment',
   },
 };
 

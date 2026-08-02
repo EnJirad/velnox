@@ -193,6 +193,15 @@ const my: Dictionary = {
     productsInShop: 'ဆိုင်ရှိ ကုန်ပစ္စည်း',
     noProductsInShop: 'ဤဆိုင်တွင် ကုန်ပစ္စည်း မရှိသေးပါ',
     merchantStatus: 'ကုန်သည် အခြေအနေ',
+    // Orders
+    ordersTitle: 'ပလက်ဖောင်း အော်ဒါများ',
+    ordersSubtitle: 'VelShop ပေါ်ရှိ အော်ဒါအားလုံး',
+    ordersCount: 'စနစ်ရှိ အော်ဒါများ',
+    noOrders: 'အော်ဒါ မရှိသေးပါ',
+    colOrder: 'အော်ဒါ',
+    colDate: 'ရက်စွဲ',
+    colTotal: 'စုစုပေါင်း',
+    colPayment: 'ငွေပေးချေမှု',
   },
 };
 

@@ -191,6 +191,16 @@ const th = {
     productsInShop: 'สินค้าในร้าน',
     noProductsInShop: 'ร้านนี้ยังไม่มีสินค้า',
     merchantStatus: 'สถานะ Merchant',
+    
+    // Orders
+    ordersTitle: 'คำสั่งซื้อทั้งแพลตฟอร์ม',
+    ordersSubtitle: 'ภาพรวมคำสั่งซื้อทั้งหมดบน VelShop',
+    ordersCount: 'คำสั่งซื้อในระบบ',
+    noOrders: 'ยังไม่มีคำสั่งซื้อในระบบ',
+    colOrder: 'คำสั่งซื้อ',
+    colDate: 'วันที่',
+    colTotal: 'ยอดรวม',
+    colPayment: 'การชำระเงิน',
   },
 };
 
