@@ -58,7 +58,12 @@ export class AuthService {
     return this.issueTokens(user.id, user.email, user.name, user.role);
   }
 
-  async refresh(refreshToken: string) {
+  async refresh(refreshToken?: string) {
+    // refreshToken can come from body or will be read from cookies in controller
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+
     let payload: { sub: string; email: string };
     try {
       payload = await this.jwtService.verifyAsync(refreshToken, {

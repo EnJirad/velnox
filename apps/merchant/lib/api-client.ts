@@ -1,12 +1,13 @@
 /**
- * API client for VelMerchant. Owns both the in-memory access token and
- * the persisted refresh token, and automatically refreshes + retries once
- * on a 401 so a short-lived (15 min) access token expiring mid-session
- * doesn't look like a broken "please log in" state.
+ * API client for VelMerchant. Manages access token in memory and refresh token in HttpOnly Cookie.
+ * Automatically refreshes + retries once on 401 so a short-lived (15 min) access token expiring
+ * mid-session doesn't look like a broken "please log in" state.
+ *
+ * Session persistence: Refresh token is stored in HttpOnly cookie by backend, so user stays
+ * logged in as long as the cookie is valid (7 days).
  */
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-const REFRESH_TOKEN_KEY = 'velnox-merchant-refresh-token';
 
 let accessToken: string | null = null;
 
@@ -14,23 +15,9 @@ export function setAccessToken(token: string | null) {
   accessToken = token;
 }
 
-export function getRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem(REFRESH_TOKEN_KEY);
-}
-
-export function setTokens(access: string, refresh: string) {
-  accessToken = access;
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
-  }
-}
-
 export function clearTokens() {
   accessToken = null;
-  if (typeof window !== 'undefined') {
-    window.localStorage.removeItem(REFRESH_TOKEN_KEY);
-  }
+  // Refresh token is managed by backend via HttpOnly cookie, no need to clear manually
 }
 
 export class ApiError extends Error {
@@ -51,16 +38,13 @@ async function parseErrorMessage(response: Response) {
 }
 
 async function refreshAccessToken(): Promise<boolean> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return false;
-
   let response: Response;
   try {
     response = await fetch(`${API_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-      credentials: 'include',
+      body: JSON.stringify({}), // Empty body - refresh token comes from cookie
+      credentials: 'include', // Important: send cookies with request
     });
   } catch {
     return false;
@@ -75,7 +59,8 @@ async function refreshAccessToken(): Promise<boolean> {
 
   const envelope = await response.json();
   const data = envelope.data; // Unwrap the TransformInterceptor envelope
-  setTokens(data.accessToken, data.refreshToken);
+  setAccessToken(data.accessToken);
+  // Refresh token is set by backend via Set-Cookie header (HttpOnly)
   return true;
 }
 
@@ -122,6 +107,10 @@ export const apiClient = {
   delete: <T>(path: string, options?: RequestOptions) =>
     request<T>(path, { ...options, method: 'DELETE' }),
 };
+
+export function hasValidAccessToken(): boolean {
+  return !!accessToken;
+}
 
 export async function uploadImage(
   file: File,
