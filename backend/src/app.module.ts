@@ -15,6 +15,7 @@ import { CartModule } from './cart/cart.module';
 import { OrdersModule } from './orders/orders.module';
 import { VelRepeatModule } from './velrepeat/velrepeat.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   providers: [
@@ -51,6 +52,7 @@ import { UploadsModule } from './uploads/uploads.module';
     OrdersModule,
     VelRepeatModule,
     UploadsModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

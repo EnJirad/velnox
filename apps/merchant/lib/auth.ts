@@ -1,9 +1,5 @@
 import type { AuthenticatedUser } from '@velnox/types';
-import { apiClient, clearTokens, getRefreshToken, setTokens } from './api-client';
-
-function persistSession(auth: AuthenticatedUser) {
-  setTokens(auth.accessToken, auth.refreshToken);
-}
+import { apiClient, clearTokens, setAccessToken } from './api-client';
 
 export function clearSession() {
   clearTokens();
@@ -11,22 +7,22 @@ export function clearSession() {
 
 export async function login(email: string, password: string) {
   const auth = await apiClient.post<AuthenticatedUser>('/auth/login', { email, password }, { skipAuth: true });
-  persistSession(auth);
+  setAccessToken(auth.accessToken);
+  // Refresh token is automatically set in HttpOnly cookie by backend
   return auth;
 }
 
 export async function register(input: { name: string; email: string; password: string; phone?: string }) {
   const auth = await apiClient.post<AuthenticatedUser>('/auth/register', input, { skipAuth: true });
-  persistSession(auth);
+  setAccessToken(auth.accessToken);
   return auth;
 }
 
 export async function restoreSession(): Promise<AuthenticatedUser['user'] | null> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
   try {
-    const auth = await apiClient.post<AuthenticatedUser>('/auth/refresh', { refreshToken }, { skipAuth: true });
-    persistSession(auth);
+    // Try to refresh using the stored refresh token in HttpOnly cookie
+    const auth = await apiClient.post<AuthenticatedUser>('/auth/refresh', {}, { skipAuth: true });
+    setAccessToken(auth.accessToken);
     return auth.user;
   } catch {
     return null;
