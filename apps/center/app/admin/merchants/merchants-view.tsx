@@ -34,6 +34,8 @@ export function MerchantsView() {
     }
   }
 
+  const pendingCount = merchants.filter((m) => m.status === 'PENDING').length;
+
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -41,9 +43,7 @@ export function MerchantsView() {
         <p className="text-sm text-slate-500">
           {loading
             ? 'กำลังโหลด...'
-            : `ทั้งหมด ${merchants.length} รายการ · รออนุมัติ ${
-                merchants.filter((m) => m.status === 'PENDING').length
-              } ร้าน`}
+            : `ทั้งหมด ${merchants.length} รายการ · รออนุมัติ ${pendingCount} ร้าน`}
         </p>
       </div>
 

@@ -11,10 +11,6 @@ import { LoadingScreen } from './loading-screen';
 import { LogoutButton } from './logout-button';
 import { apiClient } from '@/lib/api-client';
 
-// -----------------------------
-// SVG Icons (แบบ VelMerchant)
-// -----------------------------
-
 function IconChart({ className }: { className?: string }) {
   return (
     <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -122,10 +118,6 @@ function IconMenu({ className }: { className?: string }) {
   );
 }
 
-// -----------------------------
-// Types
-// -----------------------------
-
 type AdminNoti = {
   id: string;
   title: string;
@@ -159,10 +151,6 @@ function saveReadIds(ids: Set<string>) {
   localStorage.setItem(READ_KEY, JSON.stringify([...ids]));
 }
 
-// -----------------------------
-// Component
-// -----------------------------
-
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -179,7 +167,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const notiRef = useRef<HTMLDivElement>(null);
 
-  // Auth guard
   useEffect(() => {
     if (isInitializing) return;
     if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
@@ -187,17 +174,14 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isInitializing, user, router]);
 
-  // Close mobile nav on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
-  // Load read notification ids
   useEffect(() => {
     setReadIds(loadReadIds());
   }, []);
 
-  // Platform stats (badges)
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -208,15 +192,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         setPendingMerchants(s.pendingMerchants ?? 0);
         setPendingProducts(s.pendingProducts ?? 0);
       })
-      .catch(() => {
-        /* keep zeros */
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [user]);
 
-  // Admin notifications
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -226,15 +207,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         setNotifications(Array.isArray(res.notifications) ? res.notifications : []);
       })
-      .catch(() => {
-        /* keep empty */
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [user]);
 
-  // Click outside to close noti popup
   useEffect(() => {
     function onDown(e: MouseEvent) {
       if (notiRef.current && !notiRef.current.contains(e.target as Node)) {
@@ -296,9 +274,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const sidebarContent = (
     <>
       <div className="flex items-center gap-2 border-b border-slate-800 px-5 py-4">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-600 font-bold">
-          V
-        </span>
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-600 font-bold">V</span>
         <div className="min-w-0">
           <p className="text-sm font-semibold">VelCenter</p>
           <p className="truncate text-xs text-slate-400">{user.name}</p>
@@ -330,9 +306,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                     key={link.href}
                     href={link.href}
                     className={`flex items-center justify-between rounded-md px-3 py-2 font-medium ${
-                      active
-                        ? 'bg-teal-600 text-white'
-                        : 'text-slate-300 hover:bg-slate-800'
+                      active ? 'bg-teal-600 text-white' : 'text-slate-300 hover:bg-slate-800'
                     }`}
                   >
                     <span className="flex items-center gap-2">
@@ -360,9 +334,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-slate-100">
-      <aside className="hidden w-64 flex-col bg-slate-900 text-white lg:flex">
-        {sidebarContent}
-      </aside>
+      <aside className="hidden w-64 flex-col bg-slate-900 text-white lg:flex">{sidebarContent}</aside>
 
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
@@ -385,11 +357,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               <IconMenu />
             </button>
             <div>
-              <p className="text-sm font-semibold text-slate-900">
-                {t('admin.panelTitle') !== 'admin.panelTitle'
-                  ? t('admin.panelTitle')
-                  : 'แผงควบคุมผู้ดูแลระบบ'}
-              </p>
+              <p className="text-sm font-semibold text-slate-900">แผงควบคุมผู้ดูแลระบบ</p>
               <p className="hidden text-xs text-slate-400 sm:block">Velnox Platform Operations</p>
             </div>
           </div>
@@ -397,7 +365,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 sm:gap-3">
             <LanguageSwitcher />
 
-            {/* Notification bell + popup */}
             <div className="relative" ref={notiRef}>
               <button
                 type="button"
@@ -429,9 +396,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                   </div>
                   <div className="max-h-80 overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <p className="px-4 py-8 text-center text-sm text-slate-400">
-                        ไม่มีการแจ้งเตือน
-                      </p>
+                      <p className="px-4 py-8 text-center text-sm text-slate-400">ไม่มีการแจ้งเตือน</p>
                     ) : (
                       notifications.map((n) => {
                         const unread = !readIds.has(n.id) && !n.readAt;
@@ -451,9 +416,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                             }`}
                           >
                             <p className="text-sm font-medium text-slate-900">{n.title}</p>
-                            <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">
-                              {n.message}
-                            </p>
+                            <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{n.message}</p>
                             <p className="mt-1 text-[11px] text-slate-400">
                               {new Date(n.createdAt).toLocaleString('th-TH')}
                             </p>
