@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Badge } from '@velnox/ui';
 import { apiClient } from '@/lib/api-client';
@@ -11,8 +12,11 @@ type ApiShop = {
   name: string;
   description?: string | null;
   status: ShopStatus;
+  merchant?: {
+    status: string;
+    user?: { name: string; email: string };
+  };
   _count?: { products: number };
-  products?: unknown[];
 };
 
 export default function ShopsPage() {
@@ -50,9 +54,12 @@ export default function ShopsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {shops.map((s) => {
-            const productCount = s._count?.products ?? s.products?.length ?? 0;
+            const productCount = s._count?.products ?? 0;
             return (
-              <div key={s.id} className="rounded-xl border border-slate-200 bg-white p-5">
+              <div
+                key={s.id}
+                className="flex flex-col rounded-xl border border-slate-200 bg-white p-5"
+              >
                 <div className="mb-3 flex items-center justify-between">
                   <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-100 text-sm font-semibold text-teal-700">
                     {s.name.slice(0, 2).toUpperCase()}
@@ -61,11 +68,27 @@ export default function ShopsPage() {
                     {shopStatusLabel[s.status] ?? s.status}
                   </Badge>
                 </div>
+
                 <p className="text-sm font-semibold text-slate-900">{s.name}</p>
-                <p className="line-clamp-2 text-xs text-slate-500">
+                <p className="mt-0.5 text-xs text-slate-400">
+                  เจ้าของ: {s.merchant?.user?.name ?? '—'}
+                </p>
+                <p className="mt-2 line-clamp-2 text-xs text-slate-500">
                   {s.description || 'ไม่มีคำอธิบาย'}
                 </p>
-                <div className="mt-3 text-xs text-slate-500">{productCount} สินค้า</div>
+
+                <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                  <span className="font-medium text-slate-700">
+                    {productCount.toLocaleString('th-TH')} สินค้า
+                  </span>
+                </div>
+
+                <Link
+                  href={`/admin/shops/${s.id}`}
+                  className="mt-4 block w-full rounded-md border border-slate-300 py-1.5 text-center text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  ดูรายละเอียดร้านค้า
+                </Link>
               </div>
             );
           })}
