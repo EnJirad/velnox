@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
-import { refreshSession } from '@/lib/auth';
+import { restoreSession } from '@/lib/auth';
 
 interface AuthContextValue {
   isInitializing: boolean;
@@ -24,10 +24,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function bootstrap() {
-      const session = await refreshSession();
+      const user = await restoreSession();
       if (cancelled) return;
-      if (session) {
-        setUser(session.user);
+      if (user) {
+        setUser(user);
       } else {
         clearUser();
       }

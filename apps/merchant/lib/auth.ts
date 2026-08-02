@@ -1,21 +1,12 @@
 import type { AuthenticatedUser } from '@velnox/types';
-import { apiClient, setAccessToken } from './api-client';
-
-const REFRESH_TOKEN_KEY = 'velnox-merchant-refresh-token';
-
-export function getStoredRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem(REFRESH_TOKEN_KEY);
-}
+import { apiClient, clearTokens, getRefreshToken, setTokens } from './api-client';
 
 function persistSession(auth: AuthenticatedUser) {
-  setAccessToken(auth.accessToken);
-  window.localStorage.setItem(REFRESH_TOKEN_KEY, auth.refreshToken);
+  setTokens(auth.accessToken, auth.refreshToken);
 }
 
 export function clearSession() {
-  setAccessToken(null);
-  window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+  clearTokens();
 }
 
 export async function login(email: string, password: string) {
@@ -30,15 +21,14 @@ export async function register(input: { name: string; email: string; password: s
   return auth;
 }
 
-export async function refreshSession() {
-  const refreshToken = getStoredRefreshToken();
+export async function restoreSession(): Promise<AuthenticatedUser['user'] | null> {
+  const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
   try {
     const auth = await apiClient.post<AuthenticatedUser>('/auth/refresh', { refreshToken }, { skipAuth: true });
     persistSession(auth);
-    return auth;
+    return auth.user;
   } catch {
-    clearSession();
     return null;
   }
 }

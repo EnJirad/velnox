@@ -1,21 +1,12 @@
 import type { AuthenticatedUser } from '@velnox/types';
-import { apiClient, setAccessToken } from './api-client';
-
-const REFRESH_TOKEN_KEY = 'velnox-shop-refresh-token';
-
-export function getStoredRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem(REFRESH_TOKEN_KEY);
-}
+import { apiClient, clearTokens, getRefreshToken, setTokens } from './api-client';
 
 function persistSession(auth: AuthenticatedUser) {
-  setAccessToken(auth.accessToken);
-  window.localStorage.setItem(REFRESH_TOKEN_KEY, auth.refreshToken);
+  setTokens(auth.accessToken, auth.refreshToken);
 }
 
 export function clearSession() {
-  setAccessToken(null);
-  window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+  clearTokens();
 }
 
 export async function login(email: string, password: string) {
@@ -30,15 +21,22 @@ export async function register(input: { name: string; email: string; password: s
   return auth;
 }
 
-export async function refreshSession() {
-  const refreshToken = getStoredRefreshToken();
+/**
+ * Called once on app load to restore a session from a previously stored
+ * refresh token. Returns null (without clearing the stored token) on a
+ * transient/network failure so a slow cold-start backend doesn't log the
+ * person out — it'll just retry next time an API call is made.
+ */
+export async function restoreSession(): Promise<AuthenticatedUser['user'] | null> {
+  const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
   try {
     const auth = await apiClient.post<AuthenticatedUser>('/auth/refresh', { refreshToken }, { skipAuth: true });
     persistSession(auth);
-    return auth;
+    return auth.user;
   } catch {
-    clearSession();
+    // Leave the stored refresh token in place; api-client's own 401 handling
+    // will clear it if it's genuinely invalid on the next real request.
     return null;
   }
 }

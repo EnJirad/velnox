@@ -50,18 +50,18 @@ export function CheckoutView() {
     <div className="mx-auto max-w-6xl px-4 py-8">
       <h1 className="mb-6 text-xl font-semibold text-slate-900">ชำระเงิน</h1>
 
-      <div className="mb-8 flex items-center gap-2 text-sm">
+      <div className="mb-8 flex items-center gap-1.5 overflow-x-auto text-sm sm:gap-2">
         {STEPS.map((s, i) => (
-          <div key={s} className="flex items-center gap-2">
+          <div key={s} className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <div
-              className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
                 i <= step ? 'bg-teal-700 text-white' : 'bg-slate-200 text-slate-500'
               }`}
             >
               {i + 1}
             </div>
-            <span className={i <= step ? 'font-medium text-slate-900' : 'text-slate-400'}>{s}</span>
-            {i < STEPS.length - 1 && <div className="mx-2 h-px w-8 bg-slate-300" />}
+            <span className={`hidden whitespace-nowrap sm:inline ${i <= step ? 'font-medium text-slate-900' : 'text-slate-400'}`}>{s}</span>
+            {i < STEPS.length - 1 && <div className="mx-1 h-px w-5 shrink-0 bg-slate-300 sm:mx-2 sm:w-8" />}
           </div>
         ))}
       </div>

@@ -85,7 +85,7 @@ export default function DashboardHomePage() {
           <p className="text-sm font-semibold text-slate-900">คำสั่งซื้อล่าสุด</p>
           <a href="/dashboard/orders" className="text-xs font-medium text-teal-700 hover:underline">ดูทั้งหมด →</a>
         </div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
               <th className="px-4 py-2 font-medium">คำสั่งซื้อ</th>
@@ -104,7 +104,7 @@ export default function DashboardHomePage() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Card>
     </div>
   );

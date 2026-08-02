@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { useCartCount } from '@/stores/cart-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useLanguage } from '@/components/providers/language-provider';
@@ -11,13 +12,22 @@ export function Navigation() {
   const cartCount = useCartCount();
   const user = useAuthStore((s) => s.user);
   const { t } = useLanguage();
+  const pathname = usePathname();
   const [query, setQuery] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
 
   const NAV_LINKS = [
     { href: '/products', label: t('nav.products') },
     { href: '/orders', label: t('nav.orders') },
     { href: '/subscriptions', label: t('nav.subscriptions') },
   ];
+
+  const accountHref = user ? '/profile' : '/login';
+  const accountLabel = user ? user.name.split(' ')[0] : t('nav.account');
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -30,10 +40,18 @@ export function Navigation() {
           </div>
         </div>
       </div>
-      <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
+      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+        <button
+          onClick={() => setMenuOpen((v) => !v)}
+          className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100 sm:hidden"
+          aria-label="Menu"
+        >
+          {menuOpen ? '✕' : '☰'}
+        </button>
+
         <Link href="/" className="flex items-center gap-2 text-xl font-bold text-teal-700">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-700 text-white">V</span>
-          VelShop
+          <span>VelShop</span>
         </Link>
 
         <form
@@ -54,16 +72,18 @@ export function Navigation() {
           </button>
         </form>
 
-        <nav className="ml-auto flex items-center gap-5 text-sm font-medium text-slate-700">
+        <nav className="ml-auto flex items-center gap-3 text-sm font-medium text-slate-700 sm:gap-5">
           {NAV_LINKS.map((link) => (
             <Link key={link.href} href={link.href} className="hidden hover:text-teal-700 sm:inline">
               {link.label}
             </Link>
           ))}
-          <Link href="/profile" className="hidden hover:text-teal-700 sm:inline">
-            {user ? user.name.split(' ')[0] : t('nav.account')}
+          <Link href={accountHref} className="hidden hover:text-teal-700 sm:inline">
+            {accountLabel}
           </Link>
-          <LanguageSwitcher />
+          <div className="hidden sm:block">
+            <LanguageSwitcher />
+          </div>
           <Link href="/cart" className="relative flex items-center hover:text-teal-700">
             <span className="text-xl">🛒</span>
             {cartCount > 0 && (
@@ -84,6 +104,26 @@ export function Navigation() {
           />
         </form>
       </div>
+
+      {/* Mobile menu drawer */}
+      {menuOpen && (
+        <div className="border-t border-slate-200 bg-white sm:hidden">
+          <nav className="flex flex-col divide-y divide-slate-100 text-sm font-medium text-slate-700">
+            {NAV_LINKS.map((link) => (
+              <Link key={link.href} href={link.href} className="px-4 py-3 hover:bg-slate-50">
+                {link.label}
+              </Link>
+            ))}
+            <Link href={accountHref} className="px-4 py-3 hover:bg-slate-50">
+              {user ? `👤 ${accountLabel}` : `🔑 ${accountLabel}`}
+            </Link>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-slate-500">{t('nav.language')}</span>
+              <LanguageSwitcher />
+            </div>
+          </nav>
+        </div>
+      )}
     </header>
   );
 }
