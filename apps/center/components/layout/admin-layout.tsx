@@ -290,8 +290,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3 text-sm">
-        {NAV_GROUPS.map((group, groupIndex) => (
-          <div key={`\( {group.title}- \){groupIndex}`} className="mb-4">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.title} className="mb-4">
             <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               {group.title}
             </p>
