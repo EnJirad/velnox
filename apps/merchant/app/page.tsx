@@ -18,8 +18,8 @@ export default function MerchantLandingPage() {
           </div>
           <div className="flex gap-3 text-sm font-medium">
             <Link href="/login" className="rounded-md px-4 py-2 text-slate-700 hover:bg-slate-50">เข้าสู่ระบบ</Link>
-            <Link href="/dashboard" className="rounded-md bg-teal-700 px-4 py-2 text-white hover:bg-teal-800">
-              เข้าสู่แดชบอร์ด
+            <Link href="/register" className="rounded-md bg-teal-700 px-4 py-2 text-white hover:bg-teal-800">
+              สมัครเปิดร้านค้า
             </Link>
           </div>
         </div>
@@ -34,7 +34,7 @@ export default function MerchantLandingPage() {
           เข้าถึงลูกค้ากว่าหลายล้านคนบน VelShop พร้อมเครื่องมือจัดการร้านค้าที่ครบครัน
         </p>
         <div className="mt-6 flex justify-center gap-3">
-          <Link href="/dashboard" className="rounded-md bg-orange-500 px-6 py-3 text-sm font-semibold hover:bg-orange-600">
+          <Link href="/register" className="rounded-md bg-orange-500 px-6 py-3 text-sm font-semibold hover:bg-orange-600">
             เริ่มเปิดร้านค้า
           </Link>
           <Link href="/login" className="rounded-md border border-white/40 px-6 py-3 text-sm font-semibold hover:bg-white/10">

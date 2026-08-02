@@ -13,6 +13,7 @@ import { ProductsModule } from './products/products.module';
 import { CartModule } from './cart/cart.module';
 import { OrdersModule } from './orders/orders.module';
 import { VelRepeatModule } from './velrepeat/velrepeat.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { VelRepeatModule } from './velrepeat/velrepeat.module';
     CartModule,
     OrdersModule,
     VelRepeatModule,
+    UploadsModule,
   ],
 })
 export class AppModule {}

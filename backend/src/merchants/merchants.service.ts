@@ -37,12 +37,22 @@ export class MerchantsService {
     if (!merchant) {
       throw new NotFoundException('Merchant not found');
     }
-    return this.prisma.merchant.update({
+
+    const updated = await this.prisma.merchant.update({
       where: { id },
       data: {
         status: dto.status,
         approvedAt: dto.status === 'APPROVED' ? new Date() : merchant.approvedAt,
       },
     });
+
+    // Approving a merchant application grants shop-management access;
+    // rejecting/suspending revokes it back to a plain customer account.
+    await this.prisma.user.update({
+      where: { id: merchant.userId },
+      data: { role: dto.status === 'APPROVED' ? 'MERCHANT' : 'CUSTOMER' },
+    });
+
+    return updated;
   }
 }

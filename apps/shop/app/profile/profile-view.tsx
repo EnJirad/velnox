@@ -1,6 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { apiClient } from '@/lib/api-client';
+import { logout as logoutRequest } from '@/lib/auth';
+import { useAuthStore } from '@/stores/auth-store';
+import { AvatarUpload } from '@/components/avatar-upload';
 
 const TABS = [
   { key: 'info', label: 'ข้อมูลส่วนตัว' },
@@ -8,12 +13,98 @@ const TABS = [
   { key: 'security', label: 'ความปลอดภัย' },
 ];
 
+interface ProfileData {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  profile: { avatarUrl: string | null } | null;
+}
+
 export function ProfileView() {
+  const router = useRouter();
+  const clearUser = useAuthStore((s) => s.clearUser);
   const [tab, setTab] = useState('info');
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .get<ProfileData>('/users/profile')
+      .then((data) => {
+        if (cancelled) return;
+        setProfile(data);
+        setName(data.name);
+        setPhone(data.phone ?? '');
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const updated = await apiClient.patch<ProfileData>('/users/profile', { name, phone: phone || undefined });
+      setProfile(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleAvatarUploaded(url: string) {
+    try {
+      const updated = await apiClient.patch<ProfileData>('/users/profile', { avatarUrl: url });
+      setProfile(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'บันทึกรูปโปรไฟล์ไม่สำเร็จ');
+    }
+  }
+
+  async function handleLogout() {
+    await logoutRequest();
+    clearUser();
+    router.push('/');
+  }
+
+  if (loading) {
+    return <div className="mx-auto max-w-4xl px-4 py-16 text-center text-sm text-slate-400">กำลังโหลด...</div>;
+  }
+
+  if (!profile) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-24 text-center">
+        <p className="text-sm text-slate-500">กรุณาเข้าสู่ระบบเพื่อดูข้อมูลบัญชีของคุณ</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-semibold text-slate-900">บัญชีของฉัน</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-slate-900">บัญชีของฉัน</h1>
+        <button onClick={handleLogout} className="text-sm font-medium text-red-600 hover:underline">
+          ออกจากระบบ
+        </button>
+      </div>
 
       <div className="grid gap-6 md:grid-cols-[200px_1fr]">
         <nav className="flex flex-row gap-1 md:flex-col">
@@ -31,36 +122,47 @@ export function ProfileView() {
         </nav>
 
         <div className="rounded-xl border border-slate-200 bg-white p-6">
+          {error && <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+
           {tab === 'info' && (
             <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-teal-100 text-2xl font-semibold text-teal-700">
-                  ส
-                </div>
-                <button className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50">
-                  เปลี่ยนรูปโปรไฟล์
-                </button>
-              </div>
+              <AvatarUpload
+                currentUrl={profile.profile?.avatarUrl ?? null}
+                fallbackLetter={profile.name.slice(0, 1)}
+                onUploaded={handleAvatarUploaded}
+              />
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-slate-700">ชื่อ-นามสกุล</label>
-                  <input defaultValue="สมชาย ใจดี" className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600" />
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-slate-700">อีเมล</label>
-                  <input defaultValue="somchai@example.com" className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600" />
+                  <input
+                    disabled
+                    value={profile.email}
+                    className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-slate-700">เบอร์โทรศัพท์</label>
-                  <input defaultValue="081-234-5678" className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium text-slate-700">วันเกิด</label>
-                  <input type="date" className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600" />
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
+                  />
                 </div>
               </div>
-              <button className="mt-2 w-fit rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800">
-                บันทึกการเปลี่ยนแปลง
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="mt-2 w-fit rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
+              >
+                {saving ? 'กำลังบันทึก...' : saved ? '✓ บันทึกแล้ว' : 'บันทึกการเปลี่ยนแปลง'}
               </button>
             </div>
           )}
@@ -73,18 +175,7 @@ export function ProfileView() {
                   + เพิ่มที่อยู่ใหม่
                 </button>
               </div>
-              <div className="rounded-lg border border-slate-200 p-4 text-sm">
-                <div className="mb-1 flex items-center gap-2">
-                  <span className="font-medium text-slate-900">สมชาย ใจดี</span>
-                  <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs text-teal-700">ค่าเริ่มต้น</span>
-                </div>
-                <p className="text-slate-600">081-234-5678</p>
-                <p className="text-slate-600">123/45 ถนนสุขุมวิท แขวงคลองตัน เขตคลองเตย กรุงเทพฯ 10110</p>
-                <div className="mt-2 flex gap-3 text-xs">
-                  <button className="text-teal-700 hover:underline">แก้ไข</button>
-                  <button className="text-red-600 hover:underline">ลบ</button>
-                </div>
-              </div>
+              <p className="text-sm text-slate-400">ยังไม่มีที่อยู่จัดส่งที่บันทึกไว้</p>
             </div>
           )}
 

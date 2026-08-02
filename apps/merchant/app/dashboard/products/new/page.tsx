@@ -1,0 +1,13 @@
+import { ProductForm } from '@/components/product-form';
+
+export default function NewProductPage() {
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h1 className="text-xl font-semibold text-slate-900">เพิ่มสินค้าใหม่</h1>
+        <p className="text-sm text-slate-500">กรอกรายละเอียดสินค้าที่ต้องการลงขาย</p>
+      </div>
+      <ProductForm mode="create" />
+    </div>
+  );
+}

@@ -46,3 +46,29 @@ export const apiClient = {
   delete: <T>(path: string, options?: RequestOptions) =>
     request<T>(path, { ...options, method: 'DELETE' }),
 };
+
+/**
+ * Uploads a single image file as multipart/form-data (no JSON Content-Type
+ * header — the browser sets the multipart boundary itself).
+ */
+export async function uploadImage(
+  file: File,
+  folder: 'products' | 'avatars' | 'shops',
+): Promise<{ url: string; publicId: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_URL}/api/uploads/image?folder=${folder}`, {
+    method: 'POST',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ message: response.statusText }));
+    throw new Error(Array.isArray(body.message) ? body.message.join(', ') : body.message);
+  }
+
+  return response.json();
+}

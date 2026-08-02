@@ -1,18 +1,39 @@
 'use client';
 
-import { useState } from 'react';
-import { formatCurrency, formatDate } from '@velnox/utils';
+import { useEffect, useState } from 'react';
+import { formatDate } from '@velnox/utils';
 import { Badge } from '@velnox/ui';
-import { adminMerchants, type AdminMerchant } from '@/lib/mock-data';
+import { apiClient } from '@/lib/api-client';
+import type { ApiMerchant } from '@/lib/api-types';
 
 const statusTone = { PENDING: 'warning', APPROVED: 'success', REJECTED: 'danger', SUSPENDED: 'neutral' } as const;
 const statusLabel = { PENDING: 'รอตรวจสอบ', APPROVED: 'อนุมัติแล้ว', REJECTED: 'ปฏิเสธแล้ว', SUSPENDED: 'ถูกระงับ' } as const;
 
 export function MerchantsView() {
-  const [merchants, setMerchants] = useState<AdminMerchant[]>(adminMerchants);
+  const [merchants, setMerchants] = useState<ApiMerchant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  function updateStatus(id: string, status: AdminMerchant['status']) {
-    setMerchants((prev) => prev.map((m) => (m.id === id ? { ...m, status } : m)));
+  useEffect(() => {
+    apiClient
+      .get<ApiMerchant[]>('/merchants')
+      .then(setMerchants)
+      .catch((err) => setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function updateStatus(id: string, status: ApiMerchant['status']) {
+    setBusyId(id);
+    setError(null);
+    try {
+      const updated = await apiClient.patch<ApiMerchant>(`/merchants/${id}/status`, { status });
+      setMerchants((prev) => prev.map((m) => (m.id === id ? { ...m, ...updated } : m)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'อัปเดตสถานะไม่สำเร็จ');
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
@@ -22,60 +43,78 @@ export function MerchantsView() {
         <p className="text-sm text-slate-500">ตรวจสอบและอนุมัติคำขอเปิดร้านค้าใหม่</p>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs text-slate-500">
-              <th className="px-4 py-3 font-medium">ร้านค้า</th>
-              <th className="px-4 py-3 font-medium">เจ้าของ</th>
-              <th className="px-4 py-3 font-medium">สินค้า</th>
-              <th className="px-4 py-3 font-medium">ยอดขายรวม</th>
-              <th className="px-4 py-3 font-medium">วันที่สมัคร</th>
-              <th className="px-4 py-3 font-medium">สถานะ</th>
-              <th className="px-4 py-3 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {merchants.map((m) => (
-              <tr key={m.id} className="border-b border-slate-50 last:border-0">
-                <td className="px-4 py-3 font-medium text-slate-800">{m.shopName}</td>
-                <td className="px-4 py-3 text-slate-500">{m.ownerName}</td>
-                <td className="px-4 py-3 text-slate-600">{m.productsCount}</td>
-                <td className="px-4 py-3 text-slate-600">{formatCurrency(m.totalSales)}</td>
-                <td className="px-4 py-3 text-slate-500">{formatDate(m.appliedAt)}</td>
-                <td className="px-4 py-3"><Badge tone={statusTone[m.status]}>{statusLabel[m.status]}</Badge></td>
-                <td className="px-4 py-3 text-right">
-                  {m.status === 'PENDING' ? (
-                    <div className="flex justify-end gap-2">
+      {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+
+      {loading ? (
+        <div className="py-16 text-center text-sm text-slate-400">กำลังโหลด...</div>
+      ) : merchants.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center text-sm text-slate-500">
+          ยังไม่มีคำขอเปิดร้านค้า
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs text-slate-500">
+                <th className="px-4 py-3 font-medium">ผู้สมัคร</th>
+                <th className="px-4 py-3 font-medium">ร้านค้า</th>
+                <th className="px-4 py-3 font-medium">วันที่สมัคร</th>
+                <th className="px-4 py-3 font-medium">สถานะ</th>
+                <th className="px-4 py-3 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {merchants.map((m) => (
+                <tr key={m.id} className="border-b border-slate-50 last:border-0">
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-slate-800">{m.user?.name ?? '-'}</div>
+                    <div className="text-xs text-slate-400">{m.user?.email}</div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{m.shops?.[0]?.name ?? '— ยังไม่ได้ตั้งค่าร้าน —'}</td>
+                  <td className="px-4 py-3 text-slate-500">{formatDate(m.createdAt)}</td>
+                  <td className="px-4 py-3"><Badge tone={statusTone[m.status]}>{statusLabel[m.status]}</Badge></td>
+                  <td className="px-4 py-3 text-right">
+                    {m.status === 'PENDING' ? (
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => updateStatus(m.id, 'APPROVED')}
+                          disabled={busyId === m.id}
+                          className="rounded-md bg-teal-700 px-3 py-1 text-xs font-medium text-white hover:bg-teal-800 disabled:opacity-60"
+                        >
+                          อนุมัติ
+                        </button>
+                        <button
+                          onClick={() => updateStatus(m.id, 'REJECTED')}
+                          disabled={busyId === m.id}
+                          className="rounded-md border border-red-300 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+                        >
+                          ปฏิเสธ
+                        </button>
+                      </div>
+                    ) : m.status === 'APPROVED' ? (
+                      <button
+                        onClick={() => updateStatus(m.id, 'SUSPENDED')}
+                        disabled={busyId === m.id}
+                        className="text-xs font-medium text-red-600 hover:underline disabled:opacity-60"
+                      >
+                        ระงับร้านค้า
+                      </button>
+                    ) : (
                       <button
                         onClick={() => updateStatus(m.id, 'APPROVED')}
-                        className="rounded-md bg-teal-700 px-3 py-1 text-xs font-medium text-white hover:bg-teal-800"
+                        disabled={busyId === m.id}
+                        className="text-xs font-medium text-teal-700 hover:underline disabled:opacity-60"
                       >
-                        อนุมัติ
+                        อนุมัติอีกครั้ง
                       </button>
-                      <button
-                        onClick={() => updateStatus(m.id, 'REJECTED')}
-                        className="rounded-md border border-red-300 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-                      >
-                        ปฏิเสธ
-                      </button>
-                    </div>
-                  ) : m.status === 'APPROVED' ? (
-                    <button
-                      onClick={() => updateStatus(m.id, 'SUSPENDED')}
-                      className="text-xs font-medium text-red-600 hover:underline"
-                    >
-                      ระงับร้านค้า
-                    </button>
-                  ) : (
-                    <button className="text-xs font-medium text-teal-700 hover:underline">ดูรายละเอียด</button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
