@@ -10,10 +10,14 @@ import {
   paymentStatusLabel,
 } from '@/lib/order-status';
 import { useLanguage } from '@/components/providers/language-provider';
-import type { Order } from '@velnox/types';
+import type { Order, OrderItem } from '@velnox/types';
 
-type OrderRow = Order & {
-  items?: { productId?: string; product?: { id?: string; name?: string } }[];
+type OrderRowItem = OrderItem & {
+  product?: { id?: string; name?: string };
+};
+
+type OrderRow = Omit<Order, 'items'> & {
+  items?: OrderRowItem[];
 };
 
 export default function OrdersPage() {
@@ -51,9 +55,14 @@ export default function OrdersPage() {
     : orders.filter((o) => {
         if (o.id?.toLowerCase().includes(q)) return true;
         if (o.orderNumber?.toLowerCase().includes(q)) return true;
-        if (o.items?.some((it) => (it.productId ?? it.product?.id ?? '').toLowerCase().includes(q)))
+        if (
+          o.items?.some((it) =>
+            (it.productId ?? it.product?.id ?? '').toLowerCase().includes(q),
+          )
+        )
           return true;
-        if (o.items?.some((it) => (it.product?.name ?? '').toLowerCase().includes(q))) return true;
+        if (o.items?.some((it) => (it.product?.name ?? '').toLowerCase().includes(q)))
+          return true;
         return false;
       });
 
