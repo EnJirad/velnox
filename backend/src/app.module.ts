@@ -17,6 +17,7 @@ import { VelRepeatModule } from './velrepeat/velrepeat.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { PlatformSettingsModule } from './platform-settings/platform-settings.module';
+import { EventsModule } from './events/events.module';
 
 @Module({
   providers: [
@@ -32,16 +33,17 @@ import { PlatformSettingsModule } from './platform-settings/platform-settings.mo
     }),
     ThrottlerModule.forRoot([
       {
-        ttl: 60000, // 1 minute
-        limit: 100, // 100 requests per minute (general limit)
-        blockDuration: 300000, // Block for 5 minutes if limit exceeded
+        ttl: 60000,
+        limit: 100,
+        blockDuration: 300000,
       },
       {
-        ttl: 900000, // 15 minutes
-        limit: 1000, // 1000 requests per 15 minutes
+        ttl: 900000,
+        limit: 1000,
       },
     ]),
     DatabaseModule,
+    EventsModule,
     AuthModule,
     UsersModule,
     RolesModule,

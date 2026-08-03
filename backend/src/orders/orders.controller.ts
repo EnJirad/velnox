@@ -31,6 +31,12 @@ export class OrdersController {
     return this.ordersService.findAll();
   }
 
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Get('admin/:id')
+  findAdminOne(@Param('id') id: string) {
+    return this.ordersService.findAdminById(id);
+  }
+
   @Get(':id')
   findOne(@CurrentUser() user: AuthenticatedRequestUser, @Param('id') id: string) {
     return this.ordersService.findOneForUser(user.userId, id);

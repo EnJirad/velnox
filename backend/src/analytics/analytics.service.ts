@@ -483,4 +483,120 @@ export class AnalyticsService {
       topProducts,
     };
   }
+  
+  async getReportsOverview() {
+    const [
+      stats,
+      revenueChart,
+      statusGroups,
+      paymentGroups,
+      recentPaid,
+      topProductsRaw,
+      topMerchantsRaw,
+    ] = await Promise.all([
+      this.getPlatformStats(),
+      this.getRevenueChart(),
+      this.prisma.order.groupBy({ by: ['status'], _count: true }),
+      this.prisma.order.groupBy({ by: ['paymentStatus'], _count: true }),
+      this.prisma.order.findMany({
+        where: { paymentStatus: 'PAID' },
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+        include: { user: { select: { name: true, email: true } } },
+      }),
+      this.prisma.orderItem.groupBy({
+        by: ['productId'],
+        _sum: { quantity: true },
+        orderBy: { _sum: { quantity: 'desc' } },
+        take: 10,
+      }),
+      this.prisma.orderItem.groupBy({
+        by: ['merchantId'],
+        _sum: { quantity: true },
+        orderBy: { _sum: { quantity: 'desc' } },
+        take: 10,
+      }),
+    ]);
+
+    const productIds = topProductsRaw.map((r) => r.productId);
+    const merchantIds = topMerchantsRaw.map((r) => r.merchantId);
+
+    const [products, merchants, itemsForProducts, itemsForMerchants] = await Promise.all([
+      this.prisma.product.findMany({
+        where: { id: { in: productIds } },
+        select: { id: true, name: true, price: true, shop: { select: { name: true } } },
+      }),
+      this.prisma.merchant.findMany({
+        where: { id: { in: merchantIds } },
+        select: {
+          id: true,
+          user: { select: { name: true, email: true } },
+          shops: { take: 1, select: { name: true } },
+        },
+      }),
+      productIds.length
+        ? this.prisma.orderItem.findMany({
+            where: { productId: { in: productIds } },
+            select: { productId: true, price: true, quantity: true },
+          })
+        : Promise.resolve([]),
+      merchantIds.length
+        ? this.prisma.orderItem.findMany({
+            where: { merchantId: { in: merchantIds } },
+            select: { merchantId: true, price: true, quantity: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const productMap = new Map(products.map((p) => [p.id, p]));
+    const merchantMap = new Map(merchants.map((m) => [m.id, m]));
+
+    const revenueByProduct = new Map<string, number>();
+    for (const it of itemsForProducts) {
+      revenueByProduct.set(
+        it.productId,
+        (revenueByProduct.get(it.productId) ?? 0) + Number(it.price) * it.quantity,
+      );
+    }
+
+    const revenueByMerchant = new Map<string, number>();
+    for (const it of itemsForMerchants) {
+      revenueByMerchant.set(
+        it.merchantId,
+        (revenueByMerchant.get(it.merchantId) ?? 0) + Number(it.price) * it.quantity,
+      );
+    }
+
+    return {
+      stats,
+      revenueChart,
+      ordersByStatus: statusGroups.map((g) => ({ status: g.status, count: g._count })),
+      ordersByPayment: paymentGroups.map((g) => ({
+        status: g.paymentStatus,
+        count: g._count,
+      })),
+      recentPaidOrders: recentPaid,
+      topProducts: topProductsRaw.map((r) => {
+        const p = productMap.get(r.productId);
+        return {
+          productId: r.productId,
+          name: p?.name ?? r.productId,
+          shopName: p?.shop?.name ?? '—',
+          quantitySold: r._sum.quantity ?? 0,
+          revenue: revenueByProduct.get(r.productId) ?? 0,
+        };
+      }),
+      topMerchants: topMerchantsRaw.map((r) => {
+        const m = merchantMap.get(r.merchantId);
+        return {
+          merchantId: r.merchantId,
+          name: m?.shops[0]?.name ?? m?.user?.name ?? r.merchantId,
+          owner: m?.user?.name ?? '—',
+          email: m?.user?.email ?? '—',
+          quantitySold: r._sum.quantity ?? 0,
+          revenue: revenueByMerchant.get(r.merchantId) ?? 0,
+        };
+      }),
+    };
+  }
 }

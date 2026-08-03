@@ -1,8 +1,8 @@
 # Velnox — AI Handoff Document
 
-> อัปเดตล่าสุด: 2026-08-04 \~05:15 +07  
+> อัปเดตล่าสุด: 2026-08-04 \~05:30 +07  
 > Repo: https://github.com/EnJirad/velnox.git  
-> Commit อ้างอิง: `fa1198f` (fix orders page types)
+> Commit อ้างอิง: `fe57938` (Part 3 Admin Shops)
 
 ---
 
@@ -10,17 +10,14 @@
 
 | App | บทบาท | สถานะ |
 |-----|--------|--------|
-| **VelCenter** (`apps/center`) | Admin แพลตฟอร์ม | ใช้งานได้ส่วนใหญ่ — เหลือ Shops admin actions + stats |
-| **VelMerchant** (`apps/merchant`) | แดชบอร์ดร้านค้า | มีแล้ว (merchant-facing) |
-| **VelShop** (`apps/shop`) | หน้าร้านลูกค้า | ยังไม่เริ่มเฟสถัดไปจาก Center |
-| **Backend** (`backend`) | NestJS + Prisma | API หลักครบ foundation |
+| **VelCenter** (`apps/center`) | Admin แพลตฟอร์ม | ✅ พร้อมใช้ (งานหลักครบ) |
+| **VelMerchant** (`apps/merchant`) | แดชบอร์ดร้านค้า | ✅ มีแล้ว |
+| **VelShop** (`apps/shop`) | หน้าร้านลูกค้า | 🔄 UI มี — ยัง mock data เป็นหลัก |
+| **Backend** (`backend`) | NestJS + Prisma | ✅ foundation + admin APIs |
 
 ---
 
 ## Phase 1 — Platform Settings ✅
-
-- โค้ดครบแล้ว (settings UI + API + `autoApproveProducts`)
-- SQL (ถ้ายังไม่รันบน DB จริง):
 
 ```sql
 ALTER TABLE "platform_settings"

@@ -1,9 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { formatCurrency, formatDate } from '@velnox/utils';
 import { Badge } from '@velnox/ui';
 import { apiClient } from '@/lib/api-client';
+import { getAdminSocket } from '@/lib/ws-client';
 import {
   orderStatusLabel,
   orderStatusTone,
@@ -18,6 +20,7 @@ type OrderRowItem = OrderItem & {
 
 type OrderRow = Omit<Order, 'items'> & {
   items?: OrderRowItem[];
+  user?: { name?: string; email?: string };
 };
 
 export default function OrdersPage() {
@@ -27,6 +30,7 @@ export default function OrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [live, setLive] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -44,9 +48,21 @@ export default function OrdersPage() {
 
   useEffect(() => {
     load(false);
-    // polling ใกล้ real-time (ทุก 8 วินาที) — ยังไม่ใช้ websocket
-    const id = setInterval(() => load(true), 8000);
-    return () => clearInterval(id);
+    const s = getAdminSocket();
+    const onConnect = () => setLive(true);
+    const onDisconnect = () => setLive(false);
+    const refresh = () => load(true);
+    s.on('connect', onConnect);
+    s.on('disconnect', onDisconnect);
+    s.on('order:created', refresh);
+    s.on('order:updated', refresh);
+    if (s.connected) setLive(true);
+    return () => {
+      s.off('connect', onConnect);
+      s.off('disconnect', onDisconnect);
+      s.off('order:created', refresh);
+      s.off('order:updated', refresh);
+    };
   }, [load]);
 
   const q = search.trim().toLowerCase();
@@ -55,6 +71,8 @@ export default function OrdersPage() {
     : orders.filter((o) => {
         if (o.id?.toLowerCase().includes(q)) return true;
         if (o.orderNumber?.toLowerCase().includes(q)) return true;
+        if (o.user?.name?.toLowerCase().includes(q)) return true;
+        if (o.user?.email?.toLowerCase().includes(q)) return true;
         if (
           o.items?.some((it) =>
             (it.productId ?? it.product?.id ?? '').toLowerCase().includes(q),
@@ -78,7 +96,12 @@ export default function OrdersPage() {
           </p>
           {lastRefresh && (
             <p className="mt-0.5 text-xs text-slate-400">
-              อัปเดตล่าสุด {lastRefresh.toLocaleTimeString('th-TH')} · รีเฟรชอัตโนมัติทุก 8 วินาที
+              อัปเดตล่าสุด {lastRefresh.toLocaleTimeString('th-TH')} ·{' '}
+              {live ? (
+                <span className="text-emerald-600">● Live (WebSocket)</span>
+              ) : (
+                <span className="text-amber-600">○ รอเชื่อมต่อ WS</span>
+              )}
             </p>
           )}
         </div>
@@ -86,7 +109,7 @@ export default function OrdersPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหา order / product ID..."
+            placeholder="ค้นหา order / ลูกค้า / สินค้า..."
             className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
           />
           <button
@@ -111,6 +134,7 @@ export default function OrdersPage() {
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs text-slate-500">
                 <th className="px-4 py-3 font-medium">{t('admin.colOrder')}</th>
+                <th className="px-4 py-3 font-medium">ลูกค้า</th>
                 <th className="px-4 py-3 font-medium">{t('admin.colDate')}</th>
                 <th className="px-4 py-3 font-medium">{t('admin.colTotal')}</th>
                 <th className="px-4 py-3 font-medium">{t('admin.colPayment')}</th>
@@ -120,7 +144,7 @@ export default function OrdersPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400">
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
                     {t('admin.noOrders')}
                   </td>
                 </tr>
@@ -128,7 +152,16 @@ export default function OrdersPage() {
                 filtered.map((o) => (
                   <tr key={o.id} className="border-b border-slate-50 last:border-0">
                     <td className="px-4 py-3 font-medium text-slate-800">
-                      #{o.orderNumber}
+                      <Link
+                        href={`/admin/orders/${o.id}`}
+                        className="text-teal-800 hover:underline"
+                      >
+                        #{o.orderNumber}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      <div>{o.user?.name ?? '—'}</div>
+                      <div className="text-xs text-slate-400">{o.user?.email}</div>
                     </td>
                     <td className="px-4 py-3 text-slate-500">{formatDate(o.createdAt)}</td>
                     <td className="px-4 py-3 text-slate-800">

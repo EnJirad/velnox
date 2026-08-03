@@ -1,6 +1,12 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { EventsGateway } from '../events/events.gateway';
 
 const SHIPPING_FEE = 40;
 const FREE_SHIPPING_THRESHOLD = 990;
@@ -8,12 +14,15 @@ const FREE_SHIPPING_THRESHOLD = 990;
 function generateOrderNumber(): string {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `VLX-${timestamp}-${random}`;
+  return `VLX-\( {timestamp}- \){random}`;
 }
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventsGateway,
+  ) {}
 
   async createFromCart(userId: string) {
     const cart = await this.prisma.cart.findUnique({
@@ -65,7 +74,10 @@ export class OrdersService {
             ),
           },
         },
-        include: { items: true },
+        include: {
+          items: { include: { product: { select: { id: true, name: true } } } },
+          user: { select: { id: true, name: true, email: true } },
+        },
       });
 
       await Promise.all(
@@ -82,6 +94,7 @@ export class OrdersService {
       return created;
     });
 
+    this.events.emitOrderCreated(order);
     return order;
   }
 
@@ -104,6 +117,38 @@ export class OrdersService {
     return order;
   }
 
+  async findAdminById(id: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, name: true, email: true, phone: true } },
+        payment: true,
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+              },
+            },
+            merchant: {
+              select: {
+                id: true,
+                user: { select: { name: true, email: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    return order;
+  }
+
   async findForMerchant(userId: string) {
     const merchant = await this.prisma.merchant.findUnique({ where: { userId } });
     if (!merchant) {
@@ -118,7 +163,14 @@ export class OrdersService {
 
   findAll() {
     return this.prisma.order.findMany({
-      include: { items: true, user: { select: { id: true, name: true, email: true } } },
+      include: {
+        items: {
+          include: {
+            product: { select: { id: true, name: true } },
+          },
+        },
+        user: { select: { id: true, name: true, email: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -128,6 +180,19 @@ export class OrdersService {
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-    return this.prisma.order.update({ where: { id }, data: { status: dto.status } });
+    const updated = await this.prisma.order.update({
+      where: { id },
+      data: { status: dto.status },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        items: {
+          include: {
+            product: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+    this.events.emitOrderUpdated(updated);
+    return updated;
   }
 }

@@ -1,0 +1,224 @@
+'use client';
+
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { formatCurrency, formatDate } from '@velnox/utils';
+import { Badge } from '@velnox/ui';
+import { apiClient } from '@/lib/api-client';
+import {
+  orderStatusLabel,
+  orderStatusTone,
+  paymentStatusLabel,
+} from '@/lib/order-status';
+import type { OrderStatus } from '@velnox/types';
+
+type AdminOrder = {
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  paymentStatus: string;
+  subtotal: number | string;
+  shippingFee: number | string;
+  total: number | string;
+  createdAt: string;
+  user?: { id: string; name: string; email: string; phone?: string | null };
+  payment?: {
+    method: string;
+    status: string;
+    transactionId?: string | null;
+  } | null;
+  items: {
+    id: string;
+    quantity: number;
+    price: number | string;
+    product?: {
+      id: string;
+      name: string;
+      images?: { url: string }[];
+    };
+    merchant?: {
+      id: string;
+      user?: { name: string; email: string };
+    };
+  }[];
+};
+
+const STATUSES: OrderStatus[] = [
+  'PENDING',
+  'CONFIRMED',
+  'PROCESSING',
+  'SHIPPED',
+  'DELIVERED',
+  'CANCELLED',
+];
+
+export default function AdminOrderDetailPage() {
+  const params = useParams();
+  const id = String(params.id ?? '');
+  const [order, setOrder] = useState<AdminOrder | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    apiClient
+      .get<AdminOrder>(`/orders/admin/${id}`)
+      .then(setOrder)
+      .catch((err) => setError(err instanceof Error ? err.message : 'โหลดไม่สำเร็จ'))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  async function changeStatus(status: OrderStatus) {
+    if (!order) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await apiClient.patch<{ status: OrderStatus }>(
+        `/orders/${order.id}/status`,
+        { status },
+      );
+      setOrder((prev) => (prev ? { ...prev, status: updated.status } : prev));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'อัปเดตสถานะไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="py-16 text-center text-sm text-slate-400">กำลังโหลด...</div>;
+  }
+
+  if (!order) {
+    return (
+      <div className="flex flex-col gap-3">
+        <Link href="/admin/orders" className="text-sm text-teal-700 hover:underline">
+          ← กลับรายการออเดอร์
+        </Link>
+        <p className="text-sm text-red-600">{error || 'ไม่พบออเดอร์'}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Link href="/admin/orders" className="text-xs text-teal-700 hover:underline">
+            ← ออเดอร์
+          </Link>
+          <h1 className="mt-1 text-xl font-semibold text-slate-900">#{order.orderNumber}</h1>
+          <p className="text-sm text-slate-500">{formatDate(order.createdAt)}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge tone={orderStatusTone[order.status] ?? 'neutral'}>
+            {orderStatusLabel[order.status] ?? order.status}
+          </Badge>
+          <Badge tone="neutral">
+            {paymentStatusLabel[order.paymentStatus] ?? order.paymentStatus}
+          </Badge>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
+      )}
+
+      <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-4">
+        <p className="w-full text-xs font-medium text-slate-500">เปลี่ยนสถานะ</p>
+        {STATUSES.map((s) => (
+          <button
+            key={s}
+            type="button"
+            disabled={busy || order.status === s}
+            onClick={() => changeStatus(s)}
+            className={`rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
+              order.status === s
+                ? 'border-teal-600 bg-teal-50 text-teal-800'
+                : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            {orderStatusLabel[s]}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-xs text-slate-500">ยอดรวม</p>
+          <p className="mt-1 text-2xl font-bold">{formatCurrency(Number(order.total))}</p>
+          <p className="mt-1 text-xs text-slate-400">
+            สินค้า {formatCurrency(Number(order.subtotal))} · ส่ง{' '}
+            {formatCurrency(Number(order.shippingFee))}
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-xs text-slate-500">ลูกค้า</p>
+          <p className="mt-1 text-sm font-semibold">{order.user?.name ?? '—'}</p>
+          <p className="text-xs text-slate-400">{order.user?.email}</p>
+          <p className="text-xs text-slate-400">{order.user?.phone || '—'}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-xs text-slate-500">การชำระเงิน</p>
+          <p className="mt-1 text-sm font-semibold">{order.payment?.method ?? '—'}</p>
+          <p className="text-xs text-slate-400">
+            {paymentStatusLabel[order.payment?.status ?? order.paymentStatus] ??
+              order.paymentStatus}
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <p className="text-sm font-semibold">รายการสินค้า</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
+                <th className="px-4 py-2">สินค้า</th>
+                <th className="px-4 py-2">Merchant</th>
+                <th className="px-4 py-2">จำนวน</th>
+                <th className="px-4 py-2">ราคา</th>
+                <th className="px-4 py-2">รวม</th>
+              </tr>
+            </thead>
+            <tbody>
+              {order.items.map((it) => (
+                <tr key={it.id} className="border-b border-slate-50 last:border-0">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      {it.product?.images?.[0]?.url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={it.product.images[0].url}
+                          alt=""
+                          className="h-9 w-9 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-xs text-slate-400">
+                          —
+                        </span>
+                      )}
+                      <span className="font-medium">{it.product?.name ?? it.id}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-500">
+                    {it.merchant?.user?.name ?? '—'}
+                  </td>
+                  <td className="px-4 py-3">{it.quantity}</td>
+                  <td className="px-4 py-3">{formatCurrency(Number(it.price))}</td>
+                  <td className="px-4 py-3">
+                    {formatCurrency(Number(it.price) * it.quantity)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
