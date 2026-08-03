@@ -288,3 +288,24 @@ CREATE TABLE "merchant_reports" (
   CONSTRAINT "merchant_reports_merchant_id_fkey"
     FOREIGN KEY ("merchant_id") REFERENCES "merchants"("id") ON DELETE CASCADE
 );
+
+-- =========================
+-- Platform Settings (VelCenter)
+-- =========================
+
+CREATE TABLE IF NOT EXISTS "platform_settings" (
+  "id"                      TEXT PRIMARY KEY DEFAULT 'default',
+  "platform_name"           TEXT NOT NULL DEFAULT 'Velnox Commerce Platform',
+  "commission_percent"      DECIMAL(5, 2) NOT NULL DEFAULT 5,
+  "auto_approve_merchants"  BOOLEAN NOT NULL DEFAULT false,
+  "require_product_review"  BOOLEAN NOT NULL DEFAULT true,
+  "payment_credit_card"     BOOLEAN NOT NULL DEFAULT true,
+  "payment_prompt_pay"      BOOLEAN NOT NULL DEFAULT true,
+  "payment_bank_transfer"   BOOLEAN NOT NULL DEFAULT true,
+  "payment_cod"             BOOLEAN NOT NULL DEFAULT true,
+  "created_at"              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at"              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO "platform_settings" ("id") VALUES ('default')
+ON CONFLICT ("id") DO NOTHING;

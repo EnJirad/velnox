@@ -417,3 +417,23 @@ model MerchantReport {
 
   @@map("merchant_reports")
 }
+
+// -----------------------------
+// Platform Settings (VelCenter)
+// -----------------------------
+
+model PlatformSettings {
+  id                   String   @id @default("default")
+  platformName         String   @default("Velnox Commerce Platform") @map("platform_name")
+  commissionPercent    Decimal  @default(5) @db.Decimal(5, 2) @map("commission_percent")
+  autoApproveMerchants Boolean  @default(false) @map("auto_approve_merchants")
+  requireProductReview Boolean  @default(true) @map("require_product_review")
+  paymentCreditCard    Boolean  @default(true) @map("payment_credit_card")
+  paymentPromptPay     Boolean  @default(true) @map("payment_prompt_pay")
+  paymentBankTransfer  Boolean  @default(true) @map("payment_bank_transfer")
+  paymentCod           Boolean  @default(true) @map("payment_cod")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}
