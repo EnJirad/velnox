@@ -1,6 +1,5 @@
 module.exports = {
-  extends: ['eslint:recommended', 'next'],
-  rules: {
-    // Disable rules that might block production build if needed
-  }
+  root: true,
+  extends: ['next/core-web-vitals'],
+  rules: {},
 };
