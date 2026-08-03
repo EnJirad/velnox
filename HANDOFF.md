@@ -1,14 +1,32 @@
 # Velnox — AI Handoff Document
 
-> อัปเดตล่าสุด: 2026-08-03  
+> อัปเดตล่าสุด: 2026-08-03 (หลัง commit `03b17a0`)  
 > Repo: https://github.com/EnJirad/velnox.git  
-> ฟีเจอร์ที่กำลังทำ: **Platform Settings (VelCenter Admin)**
+> Commit ที่ตรวจ: `03b17a053b26a4e7c0855e4b499be64f275d2ebd` (`update2`)  
+> ฟีเจอร์: **Platform Settings (VelCenter Admin)**
+
+---
+
+## สรุปสถานะ (สั้นมาก)
+
+| ชั้น | สถานะ |
+|------|--------|
+| Backend module + API | ✅ ครบ |
+| Prisma model + migration | ✅ ครบใน repo |
+| Frontend types (`api-types.ts`) | ✅ ครบใน commit นี้ |
+| Frontend settings page (เชื่อม API) | ✅ ครบใน commit นี้ |
+| Render auto-migrate บน Neon | ⚠️ ต้องยืนยัน runtime |
+| ทดสอบ E2E ในเบราว์เซอร์ | ⚠️ ยังไม่ยืนยัน |
+| ผูก settings เข้า business logic | ❌ ยังไม่ทำ (ทำทีหลัง) |
+
+**โค้ดฟีเจอร์ Platform Settings (CRUD หน้า admin) ถือว่าเสร็จแล้ว**  
+งานที่เหลือส่วนใหญ่คือ verify บน production/staging และ (ภายหลัง) เอาค่า settings ไปใช้จริงใน flow อื่น
 
 ---
 
 ## 1. บริบทโปรเจกต์
 
-Velnox เป็น monorepo (pnpm + turbo) ประกอบด้วย:
+Monorepo (pnpm + turbo):
 
 | ส่วน | เทคโนโลยี | หน้าที่ |
 |------|-----------|---------|
@@ -16,201 +34,115 @@ Velnox เป็น monorepo (pnpm + turbo) ประกอบด้วย:
 | `apps/center` | Next.js | แผงแอดมิน (VelCenter) |
 | `apps/merchant` | Next.js | แดชบอร์ดร้านค้า |
 | `apps/shop` | Next.js | หน้าร้านลูกค้า |
-| `packages/*` | shared types, ui, i18n, utils, config | ใช้ร่วมกัน |
+| `packages/*` | shared | types, ui, i18n, utils, config |
 
-Backend deploy บน **Render** (Root Directory = `backend`)  
-Database = **Neon (PostgreSQL)**
+- Backend deploy: **Render** (Root Directory = `backend`)
+- Database: **Neon (PostgreSQL)**
 
 ---
 
-## 2. สิ่งที่ทำไปแล้ว (Backend — ครบแล้ว)
+## 2. สิ่งที่ทำเสร็จแล้ว
 
-### 2.1 Prisma
-- Model `PlatformSettings` อยู่ใน `backend/prisma/schema.prisma`
-- Migration: `backend/prisma/migrations/20260803090000_platform_settings/`
-- ฟิลด์:
-  - `id` (default `"default"`)
-  - `platformName` (default `"Velnox Commerce Platform"`)
-  - `commissionPercent` (default `5`)
-  - `autoApproveMerchants` (default `false`)
-  - `requireProductReview` (default `true`)
-  - `paymentCreditCard` / `paymentPromptPay` / `paymentBankTransfer` / `paymentCod` (default `true`)
-  - `createdAt` / `updatedAt`
-
-### 2.2 NestJS Module
-โฟลเดอร์: `backend/src/platform-settings/`
-
-| ไฟล์ | สถานะ |
-|------|--------|
-| `platform-settings.module.ts` | ✅ |
-| `platform-settings.controller.ts` | ✅ |
-| `platform-settings.service.ts` | ✅ |
-| `dto/update-platform-settings.dto.ts` | ✅ |
-
-- Import ใน `backend/src/app.module.ts` แล้ว (`PlatformSettingsModule`)
+### 2.1 Backend
+- `backend/src/platform-settings/` ครบ (module, controller, service, dto)
+- Import ใน `backend/src/app.module.ts` แล้ว
 - API:
   - `GET  /api/platform-settings` — Roles: `ADMIN`, `SUPER_ADMIN`
   - `PATCH /api/platform-settings` — Roles: `ADMIN`, `SUPER_ADMIN`
-- Service ใช้ `upsert` ด้วย `id = 'default'` → ถ้ายังไม่มีแถวจะสร้างให้อัตโนมัติ
+- Service ใช้ `upsert` ด้วย `id = 'default'`
 
-### 2.3 Deploy (Render + Neon)
-- **Build Command (แนะนำ):** `pnpm install && pnpm build`
-- **Start Command (สำคัญ — ต้องรัน migrate ก่อน start):**
+### 2.2 Prisma
+- Model `PlatformSettings` ใน `schema.prisma`
+- Migration: `backend/prisma/migrations/20260803090000_platform_settings/`
+- ฟิลด์: `platformName`, `commissionPercent`, `autoApproveMerchants`, `requireProductReview`, payment flags ×4, timestamps
+
+### 2.3 Frontend (commit `03b17a0`)
+- `apps/center/lib/api-types.ts`
+  - มี `PlatformSettings`
+  - มี `UpdatePlatformSettingsPayload`
+- `apps/center/app/admin/settings/page.tsx`
+  - โหลดด้วย `apiClient.get('/platform-settings')`
+  - บันทึกด้วย `apiClient.patch('/platform-settings', form)`
+  - มี loading / error / success
+  - Tab: ทั่วไป | การชำระเงิน | สิทธิ์ (roles = อ่านอย่างเดียว)
+  - controlled inputs (ไม่ใช่ mock แล้ว)
+
+### 2.4 ไฟล์ช่วย deploy
+- `backend/prisma/command.txt` เก็บคำสั่ง:
   ```bash
   pnpm db:migrate && pnpm start:prod
   ```
-  - `db:migrate` = `prisma migrate deploy` (production-safe)
-  - จะ apply migration ใหม่บน Neon อัตโนมัติทุกครั้งที่ deploy
-- ต้องมี env `DATABASE_URL` ชี้ไป Neon (แนะนำมี `?sslmode=require`)
 
 ---
 
-## 3. สิ่งที่ยังไม่ทำ (Frontend — ต้องทำต่อ)
+## 3. สิ่งที่ยังต้องทำ / ตรวจ
 
-### 3.1 `apps/center/lib/api-types.ts`
-**สถานะ:** ยังไม่มี type ของ Platform Settings  
-**ต้องเพิ่ม:**
+### 3.1 ยืนยัน Runtime (ทำก่อนอย่างอื่น)
+1. Render **Start Command** = `pnpm db:migrate && pnpm start:prod`
+2. Env `DATABASE_URL` ชี้ Neon ถูกต้อง (`?sslmode=require`)
+3. Deploy แล้ว migration ถูก apply → มีตาราง `platform_settings` บน Neon
+4. ทดสอบ API ด้วย token ADMIN:
+   - `GET /api/platform-settings` → 200 + ข้อมูล
+   - `PATCH /api/platform-settings` → บันทึกได้
 
-```ts
-export interface PlatformSettings {
-  id: string;
-  platformName: string;
-  commissionPercent: number;
-  autoApproveMerchants: boolean;
-  requireProductReview: boolean;
-  paymentCreditCard: boolean;
-  paymentPromptPay: boolean;
-  paymentBankTransfer: boolean;
-  paymentCod: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+### 3.2 ทดสอบ E2E บน VelCenter
+1. Login เป็น `ADMIN` หรือ `SUPER_ADMIN`
+2. เปิด `/admin/settings`
+3. ต้องโหลดค่าจาก backend (ไม่ error)
+4. แก้ค่า → กดบันทึก → เห็น success
+5. รีเฟรชหน้า → ค่ายังอยู่
 
-export type UpdatePlatformSettingsPayload = Partial<
-  Omit<PlatformSettings, 'id' | 'createdAt' | 'updatedAt'>
->;
-```
-
-### 3.2 `apps/center/app/admin/settings/page.tsx`
-**สถานะ:** ยังเป็น mock/hardcode (input ใช้ `defaultValue`, ไม่เรียก API)  
-**ต้องทำ:** แทนที่ทั้งไฟล์ด้วยเวอร์ชันที่:
-1. `useEffect` → `apiClient.get<PlatformSettings>('/platform-settings')`
-2. เก็บ state ใน form
-3. ปุ่มบันทึก → `apiClient.patch<PlatformSettings>('/platform-settings', form)`
-4. แสดง loading / error / success
-5. Tab: `general` | `payments` | `roles` (roles ยังเป็น read-only ได้)
-
-รูปแบบการเรียก API ให้ดูตัวอย่างจาก:
-- `apps/center/app/admin/merchants/merchants-view.tsx`
-- `apps/center/app/admin/users/page.tsx`
-
-`apiClient` อยู่ที่ `apps/center/lib/api-client.ts`  
-- base path ถูกต่อเป็น `${API_URL}/api${path}` อยู่แล้ว  
-- response ถูก unwrap จาก envelope `{ data, timestamp }` แล้ว
-
-### 3.3 (ยังไม่จำเป็นตอนนี้) Business logic ที่ยังไม่ผูก settings
-หลังหน้า settings ใช้ API ได้แล้ว ค่อยทำทีหลัง:
+### 3.3 (ภายหลัง) Business logic binding
+ยังไม่ผูกค่า settings เข้า flow อื่น:
 - `autoApproveMerchants` → ตอนสมัคร/สร้าง merchant
-- `requireProductReview` → ตอนสร้าง/อัปเดตสินค้า (status DRAFT vs ACTIVE)
+- `requireProductReview` → ตอนสร้าง/อัปเดตสินค้า
 - payment flags → ตอน checkout / แสดงช่องทางชำระเงิน
 
----
-
-## 4. ลำดับงานที่ AI ตัวถัดไปควรทำ
-
-1. **ตรวจ Backend บน Render**
-   - Start Command เป็น `pnpm db:migrate && pnpm start:prod` หรือยัง
-   - `DATABASE_URL` ชี้ Neon ถูกต้องหรือยัง
-   - Deploy แล้ว migration `platform_settings` ถูก apply หรือยัง
-   - ทดสอบ `GET /api/platform-settings` ด้วย token ของ ADMIN
-
-2. **แก้ Frontend types**
-   - เพิ่ม `PlatformSettings` + `UpdatePlatformSettingsPayload` ใน `apps/center/lib/api-types.ts`
-
-3. **แก้หน้า Settings**
-   - เขียนใหม่ `apps/center/app/admin/settings/page.tsx` ให้เชื่อม API จริง
-
-4. **ทดสอบ E2E**
-   - Login ADMIN ใน VelCenter → `/admin/settings`
-   - โหลดค่าจาก backend
-   - แก้ค่า → บันทึก → รีเฟรชแล้วยังอยู่
-
-5. **(ภายหลัง)** ผูก settings เข้า business logic จริง
+**อย่าเริ่มข้อ 3.3 จนกว่า 3.1–3.2 จะผ่าน**
 
 ---
 
-## 5. ข้อจำกัดที่เจอระหว่างทำงาน
+## 4. ลำดับงานสำหรับ AI / คนถัดไป
 
-- GitHub connector **ไม่มีสิทธิ์เขียน** (403 ตอน `create_or_update_file`)  
-  → AI ก่อนหน้าจึงส่งโค้ดให้ user copy เอง แทนการ push ขึ้น repo
-- ถ้า AI ตัวถัดไปจะแก้ไฟล์ใน repo โดยตรง ต้องมี write permission หรือให้ user commit เอง
+1. ตรวจ Render + Neon (migrate ผ่านหรือยัง)
+2. ทดสอบ API ตรง ๆ
+3. ทดสอบหน้า `/admin/settings` ในเบราว์เซอร์
+4. ถ้าพัง → ไล่ตามอาการ (401 / 500 / ตารางไม่มี / CORS / env)
+5. ถ้าผ่าน → ฟีเจอร์นี้ปิดได้ แล้วค่อยวางแผน business-logic binding
 
 ---
 
-## 6. ไฟล์สำคัญ (quick reference)
+## 5. ไฟล์สำคัญ
 
 ```
-backend/src/app.module.ts                          # import PlatformSettingsModule แล้ว
-backend/src/platform-settings/*                    # module ครบ
-backend/prisma/schema.prisma                       # model PlatformSettings
+backend/src/app.module.ts
+backend/src/platform-settings/*
+backend/prisma/schema.prisma
 backend/prisma/migrations/20260803090000_platform_settings/
-backend/package.json                               # scripts: db:migrate, start:prod, build
+backend/prisma/command.txt
+backend/package.json                    # db:migrate, start:prod, build
 
-apps/center/lib/api-types.ts                       # ← ต้องเพิ่ม type
-apps/center/lib/api-client.ts                      # apiClient พร้อมใช้
-apps/center/app/admin/settings/page.tsx            # ← ต้องเชื่อม API
-apps/center/app/admin/merchants/merchants-view.tsx # ตัวอย่าง pattern เรียก API
-apps/center/components/layout/admin-layout.tsx     # มีลิงก์ /admin/settings แล้ว
+apps/center/lib/api-types.ts            # ✅ มี PlatformSettings แล้ว
+apps/center/lib/api-client.ts
+apps/center/app/admin/settings/page.tsx # ✅ เชื่อม API แล้ว
+apps/center/components/layout/admin-layout.tsx  # ลิงก์ /admin/settings
 ```
 
 ---
 
-## 7. โค้ดที่เตรียมไว้แล้ว (copy ได้ทันที)
+## 6. หมายเหตุ
 
-### api-types.ts (เพิ่มท้ายไฟล์)
-
-```ts
-export interface PlatformSettings {
-  id: string;
-  platformName: string;
-  commissionPercent: number;
-  autoApproveMerchants: boolean;
-  requireProductReview: boolean;
-  paymentCreditCard: boolean;
-  paymentPromptPay: boolean;
-  paymentBankTransfer: boolean;
-  paymentCod: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type UpdatePlatformSettingsPayload = Partial<
-  Omit<PlatformSettings, 'id' | 'createdAt' | 'updatedAt'>
->;
-```
-
-### settings/page.tsx (แทนทั้งไฟล์)
-
-ใช้ pattern เดียวกับ merchants/users:
-- `useState` สำหรับ settings, form, loading, saving, error, success
-- `useEffect` โหลด `/platform-settings`
-- `handleSave` → `PATCH /platform-settings`
-- Tab general = ชื่อแพลตฟอร์ม, commission, autoApprove, requireProductReview
-- Tab payments = 4 ช่องทางชำระเงิน
-- Tab roles = แสดง SUPER_ADMIN / ADMIN แบบอ่านอย่างเดียว
-
-(รายละเอียดโค้ดเต็มมีในประวัติแชทก่อนหน้า — AI ตัวถัดไปสามารถสร้างใหม่ตาม spec ด้านบนได้)
+- Commit `03b17a0` ใส่ `HANDOFF.md` เวอร์ชันเก่าที่ยังบอกว่า Frontend เป็น mock — **ไม่ตรงความจริงแล้ว** ใช้เอกสารฉบับนี้แทน
+- GitHub connector บางรอบเขียนไฟล์ไม่ได้ (403) ถ้าต้องแก้ repo ให้ user commit เองหรือขอ write permission
+- `pnpm db:migrate` = `prisma migrate deploy` (ถูกสำหรับ production)
 
 ---
 
-## 8. สรุปสั้น ๆ สำหรับ AI ตัวถัดไป
+## 7. คำตอบสั้น ๆ: "ทั้งหมดแค่นี้ใช่ไหม?"
 
-**Backend Platform Settings เสร็จแล้ว**  
-**Frontend ยังเป็น mock**  
+**ใช่ — ในส่วนโค้ดของฟีเจอร์ Platform Settings (backend + หน้า admin ตั้งค่า) ถือว่าครบแล้ว**
 
-งานถัดไปทันที:
-1. เพิ่ม type ใน `apps/center/lib/api-types.ts`
-2. เชื่อม `apps/center/app/admin/settings/page.tsx` กับ `GET/PATCH /api/platform-settings`
-3. ยืนยันว่า Render รัน `pnpm db:migrate && pnpm start:prod` และ Neon มีตาราง `platform_settings`
-
-อย่าเริ่มทำ business-logic binding (auto-approve / product review / payment flags) จนกว่าหน้า settings จะโหลด/บันทึกจาก API ได้จริง
+เหลือแค่:
+1. ยืนยันว่า deploy/migrate บน Neon ทำงาน
+2. ทดสอบใช้งานจริงครั้งหนึ่ง
+3. (งานถัดไปคนละ epic) เอาค่า settings ไปบังคับในระบบจริง
