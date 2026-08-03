@@ -1,80 +1,59 @@
 # Velnox — AI Handoff Document
 
-> อัปเดตล่าสุด: 2026-08-03 ~23:21 +07  
+> อัปเดตล่าสุด: 2026-08-03 ~23:45 +07  
 > Repo: https://github.com/EnJirad/velnox.git  
-> งานปัจจุบัน: Phase 1 — ไฟล์โค้ดส่งครบแล้ว เหลือ SQL + schema + deploy
 
 ---
 
-## ความคืบหน้า Phase 1
+## Phase 1 — Platform Settings (โค้ดส่งครบแล้ว)
+ดูตารางไฟล์ phase1 ก่อนหน้า — เหลือ user ยืนยัน SQL/schema/deploy/ทดสอบ
 
-| รายการ | สถานะ |
-|--------|--------|
-| Frontend: api-types, settings, products, orders | ✅ ส่งครบ |
-| Backend: merchants.service | ✅ ส่งครบ |
-| Backend: products.service + controller | ✅ ส่งครบ |
-| Backend: platform-settings dto + service | ✅ ส่งครบ (service รอบนี้) |
-| Neon SQL `auto_approve_products` | ❌ ต้องรัน |
-| `schema.prisma` เพิ่ม field | ❌ ต้องแก้ |
-| commit / push / deploy | ❌ |
-| ทดสอบ 5 ข้อ | ❌ |
-
----
-
-## สิ่งที่ user ต้องทำต่อทันที
-
-### 1) Neon SQL
+SQL ยังต้องรันถ้ายังไม่รัน:
 ```sql
 ALTER TABLE "platform_settings"
   ADD COLUMN IF NOT EXISTS "auto_approve_products" BOOLEAN NOT NULL DEFAULT false;
 ```
 
-### 2) schema.prisma — ใน model PlatformSettings เพิ่ม
-```prisma
-autoApproveProducts  Boolean  @default(false) @map("auto_approve_products")
-```
+---
 
-### 3) ยืนยันว่า copy ครบทุกไฟล์ใน repo แล้ว
-```
-apps/center/lib/api-types.ts
-apps/center/app/admin/settings/page.tsx
-apps/center/app/admin/products/page.tsx
-apps/center/app/admin/orders/page.tsx
-backend/src/merchants/merchants.service.ts
-backend/src/products/products.service.ts
-backend/src/products/products.controller.ts
-backend/src/platform-settings/dto/update-platform-settings.dto.ts
-backend/src/platform-settings/platform-settings.service.ts
-```
+## Phase 2 / Part 2 — Admin Users (กำลังส่ง)
 
-### 4) Commit + deploy
-```bash
-git add .
-git commit -m "feat: wire platform settings into merchant/product flows"
-git push
-```
-- Backend Start: `pnpm start:prod`
-- รีเฟรช VelCenter
+โฟลเดอร์: `part2/`
 
-### 5) ทดสอบ
-1. Settings: % ไม่ติด 020  
-2. autoApproveMerchants → ร้าน APPROVED  
-3. requireProductReview เปิด / autoApproveProducts ปิด → สินค้า DRAFT  
-4. `/admin/products` เห็น DRAFT อนุมัติได้  
-5. `/admin/orders` polling + ค้นหา  
+| ไฟล์ | path ใน repo |
+|------|----------------|
+| users.service.ts | `backend/src/users/users.service.ts` |
+| users.controller.ts | `backend/src/users/users.controller.ts` |
+| admin-update-user.dto.ts | `backend/src/users/dto/admin-update-user.dto.ts` **(ไฟล์ใหม่)** |
+| users/page.tsx | `apps/center/app/admin/users/page.tsx` |
+| users/[id]/page.tsx | `apps/center/app/admin/users/[id]/page.tsx` **(ไฟล์ใหม่)** |
+
+### API ใหม่/ขยาย
+- `GET /users` — รวม `phone`
+- `GET /users/:id` — detail + addresses + orders + merchant
+- `PATCH /users/:id` — แก้ชื่อ/เบอร์/อีเมล/role/status (admin)
+- `DELETE /users/:id` — ลบผู้ใช้ (ห้าม SUPER_ADMIN)
+- `PATCH /users/:id/status` — แบน/ปลดแบน (ห้าม SUPER_ADMIN)
+
+### UI
+- ค้นหา ชื่อ / อีเมล / เบอร์
+- คลิกชื่อ → หน้ารายละเอียด
+- แก้ข้อมูล, แบน, ลบ, ดูประวัติออเดอร์
+
+### ลำดับส่งไฟล์ให้ user
+1. ~~backend users.service + controller + dto~~ ✅  
+2. **frontend users/page + users/[id]/page** ← ส่งรอบนี้  
+3. commit deploy ทดสอบ  
+
+---
+
+## ยังไม่ทำ (Part 3+)
+- Shops: กราฟ, ระงับชั่วคราว X วัน, ลบร้าน
+- Dashboard ละเอียด
+- WebSocket real-time
 
 ---
 
 ## Deploy notes
-- ไม่ใช้ `migrate deploy` (เคย P3005)
-- เพิ่มคอลัมน์ด้วย SQL บน Neon
-
-## Backlog หลัง Phase 1 ผ่าน
-- P2 Users detail  
-- P3 Shops admin tools  
-- P4 Dashboard  
-- P5 WebSocket  
-
-## สำหรับ AI ตัวถัดไป
-Phase 1 โค้ดส่งครบแล้ว — ช่วย user ยืนยัน SQL/schema/deploy/ทดสอบ  
-ถ้า error หลัง deploy ไล่จาก missing column `auto_approve_products` หรือ Prisma client ยังไม่รู้ field ใหม่  
+- Start: `pnpm start:prod`
+- Part 2 ไม่ต้อง migration ใหม่ (ใช้ตาราง users/orders ที่มีอยู่)

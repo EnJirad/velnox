@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { formatDate } from '@velnox/utils';
 import { Badge } from '@velnox/ui';
 import { apiClient } from '@/lib/api-client';
@@ -35,7 +36,7 @@ export default function UsersPage() {
       const updated = await apiClient.patch<ApiUser>(`/users/${user.id}/status`, {
         status: nextStatus,
       });
-      setUsers((prev) => prev.map((u) => (u.id === user.id ? updated : u)));
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, ...updated } : u)));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'อัปเดตสถานะไม่สำเร็จ');
     } finally {
@@ -43,11 +44,16 @@ export default function UsersPage() {
     }
   }
 
-  const filtered = users.filter(
-    (u) =>
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase()),
-  );
+  const q = search.trim().toLowerCase();
+  const filtered = users.filter((u) => {
+    if (!q) return true;
+    return (
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      (u.phone ?? '').toLowerCase().includes(q) ||
+      u.id.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -61,7 +67,7 @@ export default function UsersPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={t('admin.searchUsers')}
+          placeholder="ค้นหาชื่อ / อีเมล / เบอร์โทร..."
           className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
         />
       </div>
@@ -79,6 +85,7 @@ export default function UsersPage() {
               <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs text-slate-500">
                 <th className="px-4 py-3 font-medium">{t('admin.colName')}</th>
                 <th className="px-4 py-3 font-medium">{t('admin.colEmail')}</th>
+                <th className="px-4 py-3 font-medium">เบอร์โทร</th>
                 <th className="px-4 py-3 font-medium">{t('admin.colRole')}</th>
                 <th className="px-4 py-3 font-medium">{t('admin.colJoined')}</th>
                 <th className="px-4 py-3 font-medium">{t('admin.colStatus')}</th>
@@ -88,7 +95,7 @@ export default function UsersPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
                     {t('admin.noUsers')}
                   </td>
                 </tr>
@@ -96,14 +103,20 @@ export default function UsersPage() {
                 filtered.map((u) => (
                   <tr key={u.id} className="border-b border-slate-50 last:border-0">
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
+                      <Link
+                        href={`/admin/users/${u.id}`}
+                        className="flex items-center gap-3 hover:opacity-80"
+                      >
                         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-xs font-semibold text-teal-700">
                           {u.name.slice(0, 1)}
                         </span>
-                        <span className="font-medium text-slate-800">{u.name}</span>
-                      </div>
+                        <span className="font-medium text-teal-800 underline-offset-2 hover:underline">
+                          {u.name}
+                        </span>
+                      </Link>
                     </td>
                     <td className="px-4 py-3 text-slate-500">{u.email}</td>
+                    <td className="px-4 py-3 text-slate-500">{u.phone || '—'}</td>
                     <td className="px-4 py-3 text-slate-600">
                       {userRoleLabel[u.role] ?? u.role}
                     </td>
@@ -114,18 +127,26 @@ export default function UsersPage() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {u.role !== 'SUPER_ADMIN' && (
-                        <button
-                          type="button"
-                          onClick={() => toggleBan(u)}
-                          disabled={busyId === u.id}
-                          className={`text-xs font-medium hover:underline disabled:opacity-60 ${
-                            u.status === 'BANNED' ? 'text-teal-700' : 'text-red-600'
-                          }`}
+                      <div className="flex justify-end gap-3">
+                        <Link
+                          href={`/admin/users/${u.id}`}
+                          className="text-xs font-medium text-teal-700 hover:underline"
                         >
-                          {u.status === 'BANNED' ? t('admin.unban') : t('admin.ban')}
-                        </button>
-                      )}
+                          ดูรายละเอียด
+                        </Link>
+                        {u.role !== 'SUPER_ADMIN' && (
+                          <button
+                            type="button"
+                            onClick={() => toggleBan(u)}
+                            disabled={busyId === u.id}
+                            className={`text-xs font-medium hover:underline disabled:opacity-60 ${
+                              u.status === 'BANNED' ? 'text-teal-700' : 'text-red-600'
+                            }`}
+                          >
+                            {u.status === 'BANNED' ? t('admin.unban') : t('admin.ban')}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
