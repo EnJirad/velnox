@@ -22,6 +22,10 @@ export class UpdatePlatformSettingsDto {
 
   @IsOptional()
   @IsBoolean()
+  autoApproveProducts?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   paymentCreditCard?: boolean;
 
   @IsOptional()

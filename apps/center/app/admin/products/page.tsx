@@ -21,15 +21,12 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
-    // ดึงสินค้าทั้งหมด รวม DRAFT (admin เห็นผ่าน API สาธารณะ / ปรับ query ตาม backend)
     apiClient
-      .get<ApiProduct[] | { data: ApiProduct[] }>('/products')
-      .then((res) => {
-        const list = Array.isArray(res) ? res : (res as { data: ApiProduct[] }).data ?? [];
-        setProducts(list);
-      })
+      .get<ApiProduct[]>('/products/admin/all')
+      .then((list) => setProducts(Array.isArray(list) ? list : []))
       .catch((err) => setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ'))
       .finally(() => setLoading(false));
   }, []);
@@ -47,15 +44,29 @@ export default function ProductsPage() {
     }
   }
 
+  const filtered = products.filter(
+    (p) =>
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.id.toLowerCase().includes(search.toLowerCase()) ||
+      (p.shop?.name ?? '').toLowerCase().includes(search.toLowerCase()),
+  );
   const draftCount = products.filter((p) => p.status === 'DRAFT').length;
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">ตรวจสอบสินค้า</h1>
-        <p className="text-sm text-slate-500">
-          มีสินค้า {draftCount} รายการรอการตรวจสอบก่อนเผยแพร่
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">ตรวจสอบสินค้า</h1>
+          <p className="text-sm text-slate-500">
+            มีสินค้า {draftCount} รายการรอการตรวจสอบก่อนเผยแพร่
+          </p>
+        </div>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="ค้นหาชื่อ / ID / ร้าน..."
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
+        />
       </div>
 
       {error && (
@@ -77,14 +88,14 @@ export default function ProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {products.length === 0 ? (
+              {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-12 text-center text-slate-400">
                     ยังไม่มีสินค้าในระบบ
                   </td>
                 </tr>
               ) : (
-                products.map((p) => (
+                filtered.map((p) => (
                   <tr key={p.id} className="border-b border-slate-50 last:border-0">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -100,7 +111,10 @@ export default function ProductsPage() {
                             —
                           </span>
                         )}
-                        <span className="font-medium text-slate-800">{p.name}</span>
+                        <div>
+                          <span className="font-medium text-slate-800">{p.name}</span>
+                          <p className="text-[10px] text-slate-400">{p.id}</p>
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-500">{p.shop?.name ?? '—'}</td>
@@ -116,6 +130,7 @@ export default function ProductsPage() {
                       {p.status === 'DRAFT' ? (
                         <div className="flex justify-end gap-2">
                           <button
+                            type="button"
                             onClick={() => setStatus(p.id, 'ACTIVE')}
                             disabled={busyId === p.id}
                             className="rounded-md bg-teal-700 px-3 py-1 text-xs font-medium text-white hover:bg-teal-800 disabled:opacity-60"
@@ -123,6 +138,7 @@ export default function ProductsPage() {
                             อนุมัติ
                           </button>
                           <button
+                            type="button"
                             onClick={() => setStatus(p.id, 'INACTIVE')}
                             disabled={busyId === p.id}
                             className="rounded-md border border-red-300 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"

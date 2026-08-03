@@ -5,6 +5,7 @@ export interface ApiUser {
   role: 'CUSTOMER' | 'MERCHANT' | 'ADMIN' | 'SUPER_ADMIN';
   status: 'ACTIVE' | 'INACTIVE' | 'BANNED';
   createdAt: string;
+  phone?: string | null;
 }
 
 export interface ApiMerchant {
@@ -23,6 +24,8 @@ export interface PlatformSettings {
   commissionPercent: number;
   autoApproveMerchants: boolean;
   requireProductReview: boolean;
+  /** ถ้า true สินค้าใหม่เป็น ACTIVE ทันที แม้ requireProductReview = true */
+  autoApproveProducts?: boolean;
   paymentCreditCard: boolean;
   paymentPromptPay: boolean;
   paymentBankTransfer: boolean;

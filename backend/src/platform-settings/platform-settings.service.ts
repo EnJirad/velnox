@@ -14,6 +14,7 @@ export class PlatformSettingsService {
     commissionPercent: { toString(): string } | number;
     autoApproveMerchants: boolean;
     requireProductReview: boolean;
+    autoApproveProducts?: boolean;
     paymentCreditCard: boolean;
     paymentPromptPay: boolean;
     paymentBankTransfer: boolean;
@@ -27,6 +28,7 @@ export class PlatformSettingsService {
       commissionPercent: Number(row.commissionPercent),
       autoApproveMerchants: row.autoApproveMerchants,
       requireProductReview: row.requireProductReview,
+      autoApproveProducts: row.autoApproveProducts ?? false,
       paymentCreditCard: row.paymentCreditCard,
       paymentPromptPay: row.paymentPromptPay,
       paymentBankTransfer: row.paymentBankTransfer,
@@ -42,7 +44,7 @@ export class PlatformSettingsService {
       update: {},
       create: { id: DEFAULT_ID },
     });
-    return this.serialize(row);
+    return this.serialize(row as Parameters<typeof this.serialize>[0]);
   }
 
   async update(dto: UpdatePlatformSettingsDto) {
@@ -54,6 +56,9 @@ export class PlatformSettingsService {
         : {}),
       ...(dto.requireProductReview !== undefined
         ? { requireProductReview: dto.requireProductReview }
+        : {}),
+      ...(dto.autoApproveProducts !== undefined
+        ? { autoApproveProducts: dto.autoApproveProducts }
         : {}),
       ...(dto.paymentCreditCard !== undefined ? { paymentCreditCard: dto.paymentCreditCard } : {}),
       ...(dto.paymentPromptPay !== undefined ? { paymentPromptPay: dto.paymentPromptPay } : {}),
@@ -68,6 +73,6 @@ export class PlatformSettingsService {
       create: { id: DEFAULT_ID, ...data },
       update: data,
     });
-    return this.serialize(row);
+    return this.serialize(row as Parameters<typeof this.serialize>[0]);
   }
 }

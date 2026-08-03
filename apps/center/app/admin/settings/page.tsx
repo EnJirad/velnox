@@ -16,6 +16,8 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<TabKey>('general');
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [form, setForm] = useState<UpdatePlatformSettingsPayload>({});
+  /** string สำหรับช่อง % เพื่อให้ลบ/พิมพ์ได้ปกติ (ไม่ติด 020) */
+  const [commissionInput, setCommissionInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,11 +33,13 @@ export default function SettingsPage() {
           commissionPercent: data.commissionPercent,
           autoApproveMerchants: data.autoApproveMerchants,
           requireProductReview: data.requireProductReview,
+          autoApproveProducts: data.autoApproveProducts,
           paymentCreditCard: data.paymentCreditCard,
           paymentPromptPay: data.paymentPromptPay,
           paymentBankTransfer: data.paymentBankTransfer,
           paymentCod: data.paymentCod,
         });
+        setCommissionInput(String(data.commissionPercent ?? ''));
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'โหลดการตั้งค่าไม่สำเร็จ'))
       .finally(() => setLoading(false));
@@ -49,23 +53,46 @@ export default function SettingsPage() {
     setSuccess(null);
   }
 
+  function onCommissionChange(raw: string) {
+    // อนุญาตว่าง / ตัวเลข / จุดทศนิยม
+    if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
+      setCommissionInput(raw);
+      setSuccess(null);
+      if (raw === '' || raw === '.') {
+        updateField('commissionPercent', undefined);
+      } else {
+        const n = Number(raw);
+        if (!Number.isNaN(n)) updateField('commissionPercent', n);
+      }
+    }
+  }
+
   async function handleSave() {
     setSaving(true);
     setError(null);
     setSuccess(null);
     try {
-      const updated = await apiClient.patch<PlatformSettings>('/platform-settings', form);
+      const payload: UpdatePlatformSettingsPayload = {
+        ...form,
+        commissionPercent:
+          commissionInput === '' || commissionInput === '.'
+            ? 0
+            : Math.min(100, Math.max(0, Number(commissionInput))),
+      };
+      const updated = await apiClient.patch<PlatformSettings>('/platform-settings', payload);
       setSettings(updated);
       setForm({
         platformName: updated.platformName,
         commissionPercent: updated.commissionPercent,
         autoApproveMerchants: updated.autoApproveMerchants,
         requireProductReview: updated.requireProductReview,
+        autoApproveProducts: updated.autoApproveProducts,
         paymentCreditCard: updated.paymentCreditCard,
         paymentPromptPay: updated.paymentPromptPay,
         paymentBankTransfer: updated.paymentBankTransfer,
         paymentCod: updated.paymentCod,
       });
+      setCommissionInput(String(updated.commissionPercent ?? ''));
       setSuccess('บันทึกการตั้งค่าเรียบร้อยแล้ว');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'บันทึกการตั้งค่าไม่สำเร็จ');
@@ -121,12 +148,10 @@ export default function SettingsPage() {
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-slate-700">ค่าคอมมิชชั่นแพลตฟอร์ม (%)</label>
               <input
-                type="number"
-                min={0}
-                max={100}
-                step={0.01}
-                value={form.commissionPercent ?? 0}
-                onChange={(e) => updateField('commissionPercent', Number(e.target.value))}
+                inputMode="decimal"
+                value={commissionInput}
+                onChange={(e) => onCommissionChange(e.target.value)}
+                placeholder="0"
                 className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
               />
             </div>
@@ -145,6 +170,14 @@ export default function SettingsPage() {
                 onChange={(e) => updateField('requireProductReview', e.target.checked)}
               />
               ต้องตรวจสอบสินค้าใหม่ก่อนเผยแพร่
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={!!form.autoApproveProducts}
+                onChange={(e) => updateField('autoApproveProducts', e.target.checked)}
+              />
+              อนุมัติสินค้าอัตโนมัติ (ข้ามคิวตรวจสอบ)
             </label>
           </div>
           <button

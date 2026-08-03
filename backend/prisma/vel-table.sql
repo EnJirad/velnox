@@ -304,7 +304,8 @@ CREATE TABLE IF NOT EXISTS "platform_settings" (
   "payment_bank_transfer"   BOOLEAN NOT NULL DEFAULT true,
   "payment_cod"             BOOLEAN NOT NULL DEFAULT true,
   "created_at"              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "updated_at"              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  "updated_at"              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "auto_approve_products" BOOLEAN NOT NULL DEFAULT false;
 );
 
 INSERT INTO "platform_settings" ("id") VALUES ('default')

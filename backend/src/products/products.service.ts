@@ -4,6 +4,8 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { QueryProductsDto } from './dto/query-products.dto';
 
+const SETTINGS_ID = 'default';
+
 function slugify(input: string): string {
   return input
     .toString()
@@ -54,6 +56,14 @@ export class ProductsService {
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
+  /** Admin: ดูสินค้าทุกสถานะ รวม DRAFT */
+  async findAllForAdmin() {
+    return this.prisma.product.findMany({
+      include: { images: true, category: true, shop: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async findBySlug(slug: string) {
     const product = await this.prisma.product.findUnique({
       where: { slug },
@@ -76,10 +86,21 @@ export class ProductsService {
     return merchant.shops[0].id;
   }
 
+  private async resolveNewProductStatus(): Promise<'ACTIVE' | 'DRAFT'> {
+    const settings = await this.prisma.platformSettings.findUnique({
+      where: { id: SETTINGS_ID },
+    });
+    // autoApproveProducts ชนะ requireProductReview
+    if (settings?.autoApproveProducts === true) return 'ACTIVE';
+    if (settings?.requireProductReview === true) return 'DRAFT';
+    return 'ACTIVE';
+  }
+
   async createForUser(userId: string, dto: CreateProductDto) {
     const shopId = await this.getOwnedShopId(userId);
     const baseSlug = slugify(dto.name);
     const slug = `${baseSlug}-${Date.now().toString(36)}`;
+    const status = await this.resolveNewProductStatus();
 
     return this.prisma.product.create({
       data: {
@@ -90,7 +111,7 @@ export class ProductsService {
         description: dto.description,
         price: dto.price,
         stock: dto.stock,
-        status: 'ACTIVE',
+        status,
         images: dto.imageUrls
           ? {
               create: dto.imageUrls.map((url, index) => ({
@@ -133,7 +154,6 @@ export class ProductsService {
     return { success: true };
   }
 
-  // Admin moderation: approve a merchant-submitted product for listing.
   async setStatus(productId: string, status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED') {
     const product = await this.prisma.product.findUnique({ where: { id: productId } });
     if (!product) {

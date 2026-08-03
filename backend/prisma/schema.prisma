@@ -434,6 +434,7 @@ model PlatformSettings {
   paymentCod           Boolean  @default(true) @map("payment_cod")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
+  autoApproveProducts  Boolean  @default(false) @map("auto_approve_products")
 
   @@map("platform_settings")
 }

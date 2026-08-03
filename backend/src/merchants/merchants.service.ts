@@ -2,6 +2,8 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { PrismaService } from '../database/prisma.service';
 import { UpdateMerchantStatusDto } from './dto/update-merchant-status.dto';
 
+const SETTINGS_ID = 'default';
+
 @Injectable()
 export class MerchantsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -11,7 +13,28 @@ export class MerchantsService {
     if (existing) {
       throw new ConflictException('A merchant application already exists for this user');
     }
-    return this.prisma.merchant.create({ data: { userId, status: 'PENDING' } });
+
+    const settings = await this.prisma.platformSettings.findUnique({
+      where: { id: SETTINGS_ID },
+    });
+    const autoApprove = settings?.autoApproveMerchants === true;
+
+    const merchant = await this.prisma.merchant.create({
+      data: {
+        userId,
+        status: autoApprove ? 'APPROVED' : 'PENDING',
+        approvedAt: autoApprove ? new Date() : null,
+      },
+    });
+
+    if (autoApprove) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { role: 'MERCHANT' },
+      });
+    }
+
+    return merchant;
   }
 
   async findMine(userId: string) {
@@ -46,8 +69,6 @@ export class MerchantsService {
       },
     });
 
-    // Approving a merchant application grants shop-management access;
-    // rejecting/suspending revokes it back to a plain customer account.
     await this.prisma.user.update({
       where: { id: merchant.userId },
       data: { role: dto.status === 'APPROVED' ? 'MERCHANT' : 'CUSTOMER' },

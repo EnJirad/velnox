@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { formatCurrency, formatDate } from '@velnox/utils';
 import { Badge } from '@velnox/ui';
 import { apiClient } from '@/lib/api-client';
@@ -12,34 +12,82 @@ import {
 import { useLanguage } from '@/components/providers/language-provider';
 import type { Order } from '@velnox/types';
 
+type OrderRow = Order & {
+  items?: { productId?: string; product?: { id?: string; name?: string } }[];
+};
+
 export default function OrdersPage() {
   const { t } = useLanguage();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const data = await apiClient.get<OrderRow[]>('/orders');
+      setOrders(Array.isArray(data) ? data : []);
+      setError(null);
+      setLastRefresh(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('common.loading'));
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [t]);
 
   useEffect(() => {
-    apiClient
-      .get<Order[]>('/orders')
-      .then(setOrders)
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : t('common.loading')),
-      )
-      .finally(() => setLoading(false));
-  }, [t]);
+    load(false);
+    // polling ใกล้ real-time (ทุก 8 วินาที) — ยังไม่ใช้ websocket
+    const id = setInterval(() => load(true), 8000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  const q = search.trim().toLowerCase();
+  const filtered = !q
+    ? orders
+    : orders.filter((o) => {
+        if (o.id?.toLowerCase().includes(q)) return true;
+        if (o.orderNumber?.toLowerCase().includes(q)) return true;
+        if (o.items?.some((it) => (it.productId ?? it.product?.id ?? '').toLowerCase().includes(q)))
+          return true;
+        if (o.items?.some((it) => (it.product?.name ?? '').toLowerCase().includes(q))) return true;
+        return false;
+      });
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">{t('admin.ordersTitle')}</h1>
-        <p className="text-sm text-slate-500">
-          {loading
-            ? t('common.loading')
-            : `${orders.length.toLocaleString()} ${t('admin.ordersCount')}`}
-        </p>
-        {!loading && (
-          <p className="mt-0.5 text-xs text-slate-400">{t('admin.ordersSubtitle')}</p>
-        )}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">{t('admin.ordersTitle')}</h1>
+          <p className="text-sm text-slate-500">
+            {loading
+              ? t('common.loading')
+              : `${orders.length.toLocaleString()} ${t('admin.ordersCount')}`}
+          </p>
+          {lastRefresh && (
+            <p className="mt-0.5 text-xs text-slate-400">
+              อัปเดตล่าสุด {lastRefresh.toLocaleTimeString('th-TH')} · รีเฟรชอัตโนมัติทุก 8 วินาที
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหา order / product ID..."
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
+          />
+          <button
+            type="button"
+            onClick={() => load(false)}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+          >
+            รีเฟรช
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -61,14 +109,14 @@ export default function OrdersPage() {
               </tr>
             </thead>
             <tbody>
-              {orders.length === 0 ? (
+              {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-12 text-center text-slate-400">
                     {t('admin.noOrders')}
                   </td>
                 </tr>
               ) : (
-                orders.map((o) => (
+                filtered.map((o) => (
                   <tr key={o.id} className="border-b border-slate-50 last:border-0">
                     <td className="px-4 py-3 font-medium text-slate-800">
                       #{o.orderNumber}

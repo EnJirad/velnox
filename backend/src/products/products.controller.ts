@@ -19,6 +19,13 @@ export class ProductsController {
     return this.productsService.findAll(query);
   }
 
+  /** ต้องอยู่ก่อน :slug */
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Get('admin/all')
+  findAllForAdmin() {
+    return this.productsService.findAllForAdmin();
+  }
+
   @Roles('MERCHANT')
   @Get('me')
   findMine(@CurrentUser() user: AuthenticatedRequestUser) {
