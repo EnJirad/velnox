@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { ShopsService } from './shops.service';
 import { CreateShopDto } from './dto/create-shop.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
+import { AdminUpdateShopStatusDto } from './dto/admin-update-shop-status.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -21,6 +22,12 @@ export class ShopsController {
   @Roles('MERCHANT')
   findMine(@CurrentUser() user: AuthenticatedRequestUser) {
     return this.shopsService.findMine(user.userId);
+  }
+
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Get(':id/stats')
+  getAdminStats(@Param('id') id: string) {
+    return this.shopsService.getAdminStats(id);
   }
 
   @Public()
@@ -43,5 +50,17 @@ export class ShopsController {
     @Body() dto: UpdateShopDto,
   ) {
     return this.shopsService.updateOwned(user.userId, id, dto);
+  }
+
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Patch(':id/status')
+  adminUpdateStatus(@Param('id') id: string, @Body() dto: AdminUpdateShopStatusDto) {
+    return this.shopsService.adminUpdateStatus(id, dto);
+  }
+
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Delete(':id')
+  adminDelete(@Param('id') id: string) {
+    return this.shopsService.adminDelete(id);
   }
 }
