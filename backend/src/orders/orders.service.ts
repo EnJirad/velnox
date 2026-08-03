@@ -14,7 +14,7 @@ const FREE_SHIPPING_THRESHOLD = 990;
 function generateOrderNumber(): string {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `VLX-\( {timestamp}- \){random}`;
+  return `VLX-${timestamp}-${random}`;
 }
 
 @Injectable()
