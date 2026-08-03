@@ -214,7 +214,7 @@ export class AnalyticsService {
       items.push({
         id: `merchant-${m.id}`,
         title: 'ร้านค้ารออนุมัติ',
-        message: `\( {shopName} ( \){m.user.email}) รอการอนุมัติ`,
+        message: `${shopName} (${m.user.email}) รอการอนุมัติ`,
         type: 'MERCHANT_PENDING',
         href: '/admin/merchants',
         readAt: null,
@@ -238,7 +238,7 @@ export class AnalyticsService {
       items.push({
         id: `order-${o.id}`,
         title: 'คำสั่งซื้อใหม่',
-        message: `#${o.orderNumber} จาก \( {o.user.name} — ฿ \){Number(o.total).toLocaleString()}`,
+        message: `#${o.orderNumber} จาก ${o.user.name} — ฿ ${Number(o.total).toLocaleString()}`,
         type: 'ORDER_NEW',
         href: '/admin/orders',
         readAt: null,
