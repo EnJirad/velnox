@@ -16,6 +16,7 @@ import { OrdersModule } from './orders/orders.module';
 import { VelRepeatModule } from './velrepeat/velrepeat.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { PlatformSettingsModule } from './platform-settings/platform-settings.module';
 
 @Module({
   providers: [
@@ -53,6 +54,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     VelRepeatModule,
     UploadsModule,
     AnalyticsModule,
+    PlatformSettingsModule,
   ],
 })
 export class AppModule {}
