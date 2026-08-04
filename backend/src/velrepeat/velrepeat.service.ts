@@ -84,7 +84,7 @@ export class VelRepeatService {
         data: {
           packId: created.id,
           action: 'PURCHASED',
-          note: `plan=\( {dto.planCode} units= \){dto.totalUnits} packPrice=${dto.packPrice}`,
+          note: `plan=${dto.planCode} units=${dto.totalUnits} packPrice=${dto.packPrice}`,
         },
       });
 
@@ -223,7 +223,7 @@ export class VelRepeatService {
           data: {
             packId: pack.id,
             action: 'SKIPPED_OUT_OF_STOCK',
-            note: `needed=\( {units} stock= \){pack.product.stock}`,
+            note: `needed=${units} stock=${pack.product.stock}`,
           },
         });
         results.push({ packId: pack.id, skipped: 'OUT_OF_STOCK' });
