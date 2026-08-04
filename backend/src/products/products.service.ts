@@ -64,7 +64,15 @@ export class ProductsService {
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
-        include: { images: true, category: true, shop: true },
+        include: {
+          images: true,
+          category: true,
+          shop: true,
+          velRepeatPlans: {
+            where: { isActive: true },
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
       }),
       this.prisma.product.count({ where }),
     ]);
@@ -75,7 +83,12 @@ export class ProductsService {
   /** Admin: ดูสินค้าทุกสถานะ รวม DRAFT */
   async findAllForAdmin() {
     return this.prisma.product.findMany({
-      include: { images: true, category: true, shop: true },
+      include: {
+        images: true,
+        category: true,
+        shop: true,
+        velRepeatPlans: { orderBy: { sortOrder: 'asc' } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -83,7 +96,15 @@ export class ProductsService {
   async findBySlug(slug: string) {
     const product = await this.prisma.product.findUnique({
       where: { slug },
-      include: { images: true, category: true, shop: true },
+      include: {
+        images: true,
+        category: true,
+        shop: true,
+        velRepeatPlans: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
     });
     if (!product || product.status !== 'ACTIVE') {
       throw new NotFoundException('Product not found');
@@ -106,7 +127,6 @@ export class ProductsService {
     const settings = await this.prisma.platformSettings.findUnique({
       where: { id: SETTINGS_ID },
     });
-    // autoApproveProducts ชนะ requireProductReview
     if (settings?.autoApproveProducts === true) return 'ACTIVE';
     if (settings?.requireProductReview === true) return 'DRAFT';
     return 'ACTIVE';
@@ -141,6 +161,7 @@ export class ProductsService {
         price: dto.price,
         stock: dto.stock,
         status,
+        velRepeatEnabled: dto.velRepeatEnabled ?? false,
         images: dto.imageUrls
           ? {
               create: dto.imageUrls.map((url, index) => ({
@@ -150,8 +171,25 @@ export class ProductsService {
               })),
             }
           : undefined,
+        velRepeatPlans: dto.velRepeatPlans?.length
+          ? {
+              create: dto.velRepeatPlans.map((p, index) => ({
+                planCode: p.planCode,
+                frequency: p.frequency,
+                totalUnits: p.totalUnits,
+                unitsPerDelivery: p.unitsPerDelivery ?? 1,
+                discountPercent: p.discountPercent ?? 0,
+                freeShipping: p.freeShipping ?? true,
+                isActive: p.isActive ?? true,
+                sortOrder: p.sortOrder ?? index,
+              })),
+            }
+          : undefined,
       },
-      include: { images: true },
+      include: {
+        images: true,
+        velRepeatPlans: { orderBy: { sortOrder: 'asc' } },
+      },
     });
   }
 
@@ -159,7 +197,10 @@ export class ProductsService {
     const shopId = await this.getOwnedShopId(userId);
     return this.prisma.product.findMany({
       where: { shopId },
-      include: { images: true },
+      include: {
+        images: true,
+        velRepeatPlans: { orderBy: { sortOrder: 'asc' } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -178,6 +219,8 @@ export class ProductsService {
       stock?: number;
       status?: 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
       sellerSku?: string | null;
+      categoryId?: string;
+      velRepeatEnabled?: boolean;
     } = {};
 
     if (dto.name !== undefined) data.name = dto.name;
@@ -185,12 +228,44 @@ export class ProductsService {
     if (dto.price !== undefined) data.price = dto.price;
     if (dto.stock !== undefined) data.stock = dto.stock;
     if (dto.status !== undefined) data.status = dto.status;
+    if (dto.categoryId !== undefined) data.categoryId = dto.categoryId;
     if (dto.sellerSku !== undefined) {
       data.sellerSku = dto.sellerSku?.trim() || null;
     }
-    // sku ไม่ให้แก้จาก client
+    if (dto.velRepeatEnabled !== undefined) {
+      data.velRepeatEnabled = dto.velRepeatEnabled;
+    }
 
-    return this.prisma.product.update({ where: { id: productId }, data });
+    return this.prisma.$transaction(async (tx) => {
+      await tx.product.update({ where: { id: productId }, data });
+
+      if (dto.velRepeatPlans !== undefined) {
+        await tx.productVelRepeatPlan.deleteMany({ where: { productId } });
+        if (dto.velRepeatPlans.length > 0) {
+          await tx.productVelRepeatPlan.createMany({
+            data: dto.velRepeatPlans.map((p, index) => ({
+              productId,
+              planCode: p.planCode,
+              frequency: p.frequency,
+              totalUnits: p.totalUnits,
+              unitsPerDelivery: p.unitsPerDelivery ?? 1,
+              discountPercent: p.discountPercent ?? 0,
+              freeShipping: p.freeShipping ?? true,
+              isActive: p.isActive ?? true,
+              sortOrder: p.sortOrder ?? index,
+            })),
+          });
+        }
+      }
+
+      return tx.product.findUnique({
+        where: { id: productId },
+        include: {
+          images: true,
+          velRepeatPlans: { orderBy: { sortOrder: 'asc' } },
+        },
+      });
+    });
   }
 
   async removeOwned(userId: string, productId: string) {

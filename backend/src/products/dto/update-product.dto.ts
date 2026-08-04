@@ -1,4 +1,17 @@
-import { IsIn, IsInt, IsNumber, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { ProductVelRepeatPlanDto } from './create-product.dto';
 
 export class UpdateProductDto {
   @IsOptional()
@@ -27,4 +40,18 @@ export class UpdateProductDto {
   @IsOptional()
   @IsIn(['DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED'])
   status?: 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
+
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  velRepeatEnabled?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductVelRepeatPlanDto)
+  velRepeatPlans?: ProductVelRepeatPlanDto[];
 }

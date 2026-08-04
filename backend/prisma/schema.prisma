@@ -411,6 +411,27 @@ model VelRepeatHistory {
   @@map("velrepeat_history")
 }
 
+/// แผนแพ็กที่ร้านตั้งต่อสินค้า (Shop ดึงไปแสดง)
+model ProductVelRepeatPlan {
+  id               String             @id @default(uuid())
+  productId        String             @map("product_id")
+  planCode         String             @map("plan_code")
+  frequency        VelRepeatFrequency
+  totalUnits       Int                @map("total_units")
+  unitsPerDelivery Int                @default(1) @map("units_per_delivery")
+  discountPercent  Int                @default(0) @map("discount_percent")
+  freeShipping     Boolean            @default(true) @map("free_shipping")
+  isActive         Boolean            @default(true) @map("is_active")
+  sortOrder        Int                @default(0) @map("sort_order")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, isActive])
+  @@map("product_velrepeat_plans")
+}
+
 // -----------------------------
 // Notification Domain
 // -----------------------------

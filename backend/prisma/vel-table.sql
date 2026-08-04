@@ -284,6 +284,27 @@ CREATE TABLE "velrepeat_history" (
     FOREIGN KEY ("pack_id") REFERENCES "velrepeat_packs"("id") ON DELETE CASCADE
 );
 
+ALTER TABLE "products"
+  ADD COLUMN IF NOT EXISTS "vel_repeat_enabled" BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS "product_velrepeat_plans" (
+  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "product_id" UUID NOT NULL REFERENCES "products"("id") ON DELETE CASCADE,
+  "plan_code" TEXT NOT NULL,
+  "frequency" "VelRepeatFrequency" NOT NULL,
+  "total_units" INTEGER NOT NULL,
+  "units_per_delivery" INTEGER NOT NULL DEFAULT 1,
+  "discount_percent" INTEGER NOT NULL DEFAULT 0,
+  "free_shipping" BOOLEAN NOT NULL DEFAULT TRUE,
+  "is_active" BOOLEAN NOT NULL DEFAULT TRUE,
+  "sort_order" INTEGER NOT NULL DEFAULT 0,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS "product_velrepeat_plans_product_id_is_active_idx"
+  ON "product_velrepeat_plans" ("product_id", "is_active");
+  
 -- =========================
 -- Notification Domain
 -- =========================
