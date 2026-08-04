@@ -228,31 +228,63 @@ CREATE TABLE "payments" (
 );
 
 -- =========================
--- VelRepeat Domain
+-- VelRepeat Domain (Prepaid Pack)
 -- =========================
 
-CREATE TABLE "velrepeat_subscriptions" (
-  "id"              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id"         UUID NOT NULL,
-  "product_id"      UUID NOT NULL,
-  "frequency"       "VelRepeatFrequency" NOT NULL,
-  "quantity"        INTEGER NOT NULL,
-  "status"          "VelRepeatStatus" NOT NULL DEFAULT 'ACTIVE',
-  "next_order_date" TIMESTAMPTZ NOT NULL,
-  "created_at"      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT "velrepeat_subscriptions_user_id_fkey"
+CREATE TYPE "VelRepeatFrequency" AS ENUM ('WEEKLY', 'BI_WEEKLY', 'MONTHLY');
+CREATE TYPE "VelRepeatPackStatus" AS ENUM ('ACTIVE', 'PAUSED', 'COMPLETED', 'CANCELLED');
+
+CREATE TABLE "velrepeat_packs" (
+  "id"                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "user_id"            UUID NOT NULL,
+  "product_id"         UUID NOT NULL,
+  "plan_code"          TEXT NOT NULL,
+  "frequency"          "VelRepeatFrequency" NOT NULL,
+  "total_units"        INTEGER NOT NULL,
+  "remaining_units"    INTEGER NOT NULL,
+  "units_per_delivery" INTEGER NOT NULL DEFAULT 1,
+  "unit_price"         DECIMAL(12, 2) NOT NULL,
+  "pack_price"         DECIMAL(12, 2) NOT NULL,
+  "free_shipping"      BOOLEAN NOT NULL DEFAULT TRUE,
+  "status"             "VelRepeatPackStatus" NOT NULL DEFAULT 'ACTIVE',
+  "next_delivery_date" TIMESTAMPTZ NOT NULL,
+  "prepaid_payment_id" TEXT,
+  "created_at"         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at"         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT "velrepeat_packs_user_id_fkey"
     FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE,
-  CONSTRAINT "velrepeat_subscriptions_product_id_fkey"
+  CONSTRAINT "velrepeat_packs_product_id_fkey"
     FOREIGN KEY ("product_id") REFERENCES "products"("id")
 );
 
+CREATE INDEX "velrepeat_packs_user_id_status_idx"
+  ON "velrepeat_packs"("user_id", "status");
+
+CREATE INDEX "velrepeat_packs_next_delivery_date_status_idx"
+  ON "velrepeat_packs"("next_delivery_date", "status");
+
+CREATE TABLE "velrepeat_deliveries" (
+  "id"           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "pack_id"      UUID NOT NULL,
+  "order_id"     UUID UNIQUE,
+  "units"        INTEGER NOT NULL DEFAULT 1,
+  "scheduled_at" TIMESTAMPTZ NOT NULL,
+  "delivered_at" TIMESTAMPTZ,
+  "created_at"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT "velrepeat_deliveries_pack_id_fkey"
+    FOREIGN KEY ("pack_id") REFERENCES "velrepeat_packs"("id") ON DELETE CASCADE,
+  CONSTRAINT "velrepeat_deliveries_order_id_fkey"
+    FOREIGN KEY ("order_id") REFERENCES "orders"("id")
+);
+
 CREATE TABLE "velrepeat_history" (
-  "id"              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "subscription_id" UUID NOT NULL,
-  "action"          TEXT NOT NULL,
-  "created_at"      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT "velrepeat_history_subscription_id_fkey"
-    FOREIGN KEY ("subscription_id") REFERENCES "velrepeat_subscriptions"("id") ON DELETE CASCADE
+  "id"         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "pack_id"    UUID NOT NULL,
+  "action"     TEXT NOT NULL,
+  "note"       TEXT,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT "velrepeat_history_pack_id_fkey"
+    FOREIGN KEY ("pack_id") REFERENCES "velrepeat_packs"("id") ON DELETE CASCADE
 );
 
 -- =========================

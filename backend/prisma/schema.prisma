@@ -346,33 +346,79 @@ model Payment {
 }
 
 // -----------------------------
-// VelRepeat Domain (Subscriptions)
+// VelRepeat Domain (Prepaid Pack)
 // -----------------------------
 
-model VelRepeatSubscription {
-  id            String             @id @default(uuid())
-  userId        String             @map("user_id")
-  productId     String             @map("product_id")
-  frequency     VelRepeatFrequency
-  quantity      Int
-  status        VelRepeatStatus    @default(ACTIVE)
-  nextOrderDate DateTime           @map("next_order_date")
-  createdAt     DateTime           @default(now()) @map("created_at")
+enum VelRepeatFrequency {
+  WEEKLY
+  BI_WEEKLY
+  MONTHLY
+}
 
-  user    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product Product                 @relation(fields: [productId], references: [id])
-  history VelRepeatHistory[]
+enum VelRepeatPackStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
 
-  @@map("velrepeat_subscriptions")
+/// แพ็กที่ลูกค้าซื้อ (จ่ายก้อนเดียว)
+model VelRepeatPack {
+  id               String              @id @default(uuid())
+  userId           String              @map("user_id")
+  productId        String              @map("product_id")
+
+  planCode         String              @map("plan_code")   // e.g. WEEKLY_4, MONTHLY_3
+  frequency        VelRepeatFrequency
+  totalUnits       Int                 @map("total_units") // จำนวนชิ้นทั้งหมดในแพ็ก
+  remainingUnits   Int                 @map("remaining_units")
+  unitsPerDelivery Int                 @default(1) @map("units_per_delivery")
+
+  unitPrice        Decimal             @db.Decimal(12, 2) @map("unit_price") // ราคาต่อชิ้นในแพ็ก
+  packPrice        Decimal             @db.Decimal(12, 2) @map("pack_price") // ยอดที่จ่ายจริง
+  freeShipping     Boolean             @default(true) @map("free_shipping")
+
+  status           VelRepeatPackStatus @default(ACTIVE)
+  nextDeliveryDate DateTime            @map("next_delivery_date")
+  prepaidPaymentId String?             @map("prepaid_payment_id") // อ้างอิง payment ก้อนเดียว
+
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product    Product                @relation(fields: [productId], references: [id])
+  deliveries VelRepeatDelivery[]
+  history    VelRepeatHistory[]
+
+  @@index([userId, status])
+  @@index([nextDeliveryDate, status])
+  @@map("velrepeat_packs")
+}
+
+/// แต่ละรอบที่ระบบส่งของจากเครดิตแพ็ก
+model VelRepeatDelivery {
+  id          String    @id @default(uuid())
+  packId      String    @map("pack_id")
+  orderId     String?   @unique @map("order_id") // order ที่สร้างเพื่อส่งของ (paymentStatus = PAID)
+  units       Int       @default(1)
+  scheduledAt DateTime  @map("scheduled_at")
+  deliveredAt DateTime? @map("delivered_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  pack  VelRepeatPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+  order Order?        @relation(fields: [orderId], references: [id])
+
+  @@map("velrepeat_deliveries")
 }
 
 model VelRepeatHistory {
-  id             String   @id @default(uuid())
-  subscriptionId String   @map("subscription_id")
-  action         String
-  createdAt      DateTime @default(now()) @map("created_at")
+  id        String   @id @default(uuid())
+  packId    String   @map("pack_id")
+  action    String   // PURCHASED | DELIVERED | PAUSED | RESUMED | CANCELLED | COMPLETED | SKIPPED_OUT_OF_STOCK
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
 
-  subscription VelRepeatSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  pack VelRepeatPack @relation(fields: [packId], references: [id], onDelete: Cascade)
 
   @@map("velrepeat_history")
 }
