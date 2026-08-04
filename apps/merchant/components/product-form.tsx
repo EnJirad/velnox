@@ -145,7 +145,7 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
     return plans
       .filter((p) => Number(p.totalUnits) >= 1)
       .map((p, i) => ({
-        planCode: p.planCode.trim() || `\( {p.frequency}_ \){p.totalUnits}`,
+        planCode: p.planCode.trim() || `${p.frequency}_${p.totalUnits}`,
         frequency: p.frequency,
         totalUnits: Number(p.totalUnits),
         unitsPerDelivery: 1,
