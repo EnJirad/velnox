@@ -1,71 +1,55 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@velnox/utils';
 import { useVelRepeatStore, type VelRepeatFrequency } from '@/stores/velrepeat-store';
 import { useLanguage } from '@/components/providers/language-provider';
-import type { CatalogProduct } from '@/lib/catalog';
+import type { CatalogProduct, CatalogVelRepeatPlan } from '@/lib/catalog';
 
-type PackOption = {
+type BuiltOption = {
   planCode: string;
   frequency: VelRepeatFrequency;
   totalUnits: number;
   unitsPerDelivery: number;
-  discountPercent: number; // ส่วนลดจากราคาปกติ
-  label: string;
-  sublabel: string;
-};
-
-function buildPackOptions(sellPrice: number): (PackOption & {
   unitPrice: number;
   packPrice: number;
   saveAmount: number;
-})[] {
-  const base: PackOption[] = [
-    {
-      planCode: 'WEEKLY_4',
-      frequency: 'WEEKLY',
-      totalUnits: 4,
-      unitsPerDelivery: 1,
-      discountPercent: 5,
-      label: 'ส่งทุกสัปดาห์ × 4',
-      sublabel: '4 ชิ้น · ประหยัด 5%',
-    },
-    {
-      planCode: 'WEEKLY_8',
-      frequency: 'WEEKLY',
-      totalUnits: 8,
-      unitsPerDelivery: 1,
-      discountPercent: 10,
-      label: 'ส่งทุกสัปดาห์ × 8',
-      sublabel: '8 ชิ้น · ประหยัด 10%',
-    },
-    {
-      planCode: 'MONTHLY_3',
-      frequency: 'MONTHLY',
-      totalUnits: 3,
-      unitsPerDelivery: 1,
-      discountPercent: 8,
-      label: 'ส่งทุกเดือน × 3',
-      sublabel: '3 ชิ้น · ประหยัด 8%',
-    },
-    {
-      planCode: 'MONTHLY_6',
-      frequency: 'MONTHLY',
-      totalUnits: 6,
-      unitsPerDelivery: 1,
-      discountPercent: 15,
-      label: 'ส่งทุกเดือน × 6',
-      sublabel: '6 ชิ้น · ประหยัด 15%',
-    },
-  ];
+  label: string;
+  sublabel: string;
+  freeShipping: boolean;
+};
 
-  return base.map((opt) => {
-    const unitPrice = Math.round(sellPrice * (1 - opt.discountPercent / 100));
-    const packPrice = unitPrice * opt.totalUnits;
-    const saveAmount = sellPrice * opt.totalUnits - packPrice;
-    return { ...opt, unitPrice, packPrice, saveAmount };
+function freqLabel(f: string) {
+  if (f === 'WEEKLY') return 'ส่งทุกสัปดาห์';
+  if (f === 'BI_WEEKLY') return 'ส่งทุก 2 สัปดาห์';
+  return 'ส่งทุกเดือน';
+}
+
+function buildFromPlans(
+  sellPrice: number,
+  plans: CatalogVelRepeatPlan[],
+): BuiltOption[] {
+  return plans.map((p) => {
+    const discount = p.discountPercent ?? 0;
+    const unitPrice = Math.round(sellPrice * (1 - discount / 100));
+    const packPrice = unitPrice * p.totalUnits;
+    const saveAmount = sellPrice * p.totalUnits - packPrice;
+    return {
+      planCode: p.planCode,
+      frequency: p.frequency,
+      totalUnits: p.totalUnits,
+      unitsPerDelivery: p.unitsPerDelivery ?? 1,
+      unitPrice,
+      packPrice,
+      saveAmount,
+      freeShipping: p.freeShipping ?? true,
+      label: `${freqLabel(p.frequency)} × ${p.totalUnits}`,
+      sublabel:
+        `${p.totalUnits} ชิ้น` +
+        (discount > 0 ? ` · ประหยัด ${discount}%` : '') +
+        (p.freeShipping !== false ? ' · ส่งฟรี' : ''),
+    };
   });
 }
 
@@ -74,14 +58,24 @@ export function VelRepeatWidget({ product }: { product: CatalogProduct }) {
   const router = useRouter();
   const purchasePack = useVelRepeatStore((s) => s.purchasePack);
 
-  const options = buildPackOptions(product.price);
+  const options = useMemo(() => {
+    if (!product.velRepeatEnabled) return [];
+    const plans = product.velRepeatPlans ?? [];
+    if (plans.length === 0) return [];
+    return buildFromPlans(product.price, plans);
+  }, [product]);
+
   const [enabled, setEnabled] = useState(false);
-  const [selected, setSelected] = useState(options[0].planCode);
+  const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const current = options.find((o) => o.planCode === selected) ?? options[0];
+  // ไม่เปิด / ไม่มีแผน → ไม่แสดง (ขายปกติอย่างเดียว)
+  if (options.length === 0) return null;
+
+  const current =
+    options.find((o) => o.planCode === (selected || options[0].planCode)) ?? options[0];
 
   async function handlePurchase() {
     setLoading(true);
@@ -95,7 +89,7 @@ export function VelRepeatWidget({ product }: { product: CatalogProduct }) {
         unitsPerDelivery: current.unitsPerDelivery,
         unitPrice: current.unitPrice,
         packPrice: current.packPrice,
-        freeShipping: true,
+        freeShipping: current.freeShipping,
       });
       setDone(true);
     } catch (e: any) {
@@ -123,14 +117,14 @@ export function VelRepeatWidget({ product }: { product: CatalogProduct }) {
         />
       </label>
       <p className="mt-1 text-xs text-slate-500">
-        จ่ายครั้งเดียว ได้เครดิตส่งของตามรอบ · ส่งฟรีทุกครั้ง
+        จ่ายครั้งเดียว ได้เครดิตส่งของตามรอบ · แผนตั้งโดยร้านค้า
       </p>
 
       {enabled && !done && (
         <div className="mt-3 flex flex-col gap-3 border-t border-teal-100 pt-3">
           <div className="flex flex-col gap-2">
             {options.map((opt) => {
-              const active = selected === opt.planCode;
+              const active = current.planCode === opt.planCode;
               return (
                 <label
                   key={opt.planCode}

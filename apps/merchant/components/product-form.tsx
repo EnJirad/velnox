@@ -11,6 +11,31 @@ interface ProductFormProps {
   initial?: ApiProduct;
 }
 
+type PlanRow = {
+  planCode: string;
+  frequency: 'WEEKLY' | 'BI_WEEKLY' | 'MONTHLY';
+  totalUnits: string;
+  discountPercent: string;
+  freeShipping: boolean;
+};
+
+const DEFAULT_PLANS: PlanRow[] = [
+  {
+    planCode: 'WEEKLY_4',
+    frequency: 'WEEKLY',
+    totalUnits: '4',
+    discountPercent: '5',
+    freeShipping: true,
+  },
+  {
+    planCode: 'MONTHLY_3',
+    frequency: 'MONTHLY',
+    totalUnits: '3',
+    discountPercent: '8',
+    freeShipping: true,
+  },
+];
+
 export function ProductForm({ mode, productId, initial }: ProductFormProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -29,6 +54,19 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
   const [images, setImages] = useState<{ url: string }[]>(
     initial?.images?.map((img) => ({ url: img.url })) ?? [],
   );
+  const [velRepeatEnabled, setVelRepeatEnabled] = useState(initial?.velRepeatEnabled ?? false);
+  const [plans, setPlans] = useState<PlanRow[]>(() => {
+    if (initial?.velRepeatPlans?.length) {
+      return initial.velRepeatPlans.map((p) => ({
+        planCode: p.planCode,
+        frequency: p.frequency,
+        totalUnits: String(p.totalUnits),
+        discountPercent: String(p.discountPercent ?? 0),
+        freeShipping: p.freeShipping ?? true,
+      }));
+    }
+    return DEFAULT_PLANS;
+  });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -102,6 +140,22 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
     return cat.id;
   }
 
+  function buildPlansPayload() {
+    if (!velRepeatEnabled) return [];
+    return plans
+      .filter((p) => Number(p.totalUnits) >= 1)
+      .map((p, i) => ({
+        planCode: p.planCode.trim() || `\( {p.frequency}_ \){p.totalUnits}`,
+        frequency: p.frequency,
+        totalUnits: Number(p.totalUnits),
+        unitsPerDelivery: 1,
+        discountPercent: Number(p.discountPercent) || 0,
+        freeShipping: p.freeShipping,
+        isActive: true,
+        sortOrder: i,
+      }));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -115,6 +169,7 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
     try {
       const resolvedCategoryId = await resolveCategoryId();
       const sellerSkuValue = sellerSku.trim() || undefined;
+      const plansPayload = buildPlansPayload();
 
       if (mode === 'create') {
         await apiClient.post('/products', {
@@ -125,6 +180,8 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
           stock: Number(stock),
           sellerSku: sellerSkuValue,
           imageUrls: images.map((img) => img.url),
+          velRepeatEnabled,
+          velRepeatPlans: plansPayload,
         });
       } else if (productId) {
         await apiClient.patch(`/products/${productId}`, {
@@ -135,6 +192,8 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
           status,
           sellerSku: sellerSku.trim() || '',
           ...(resolvedCategoryId ? { categoryId: resolvedCategoryId } : {}),
+          velRepeatEnabled,
+          velRepeatPlans: plansPayload,
         });
       }
       router.push('/dashboard/products');
@@ -249,12 +308,9 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
                 </li>
               </ul>
             )}
-            {categoryId && (
-              <p className="text-xs text-teal-700">เลือกแล้ว: #{categoryQuery}</p>
-            )}
+            {categoryId && <p className="text-xs text-teal-700">เลือกแล้ว: #{categoryQuery}</p>}
           </div>
 
-          {/* Platform SKU — โชว์ตอนแก้ไขเท่านั้น (ระบบเจนอัตโนมัติ) */}
           {mode === 'edit' && initial?.sku && (
             <div className="flex flex-col gap-1 sm:col-span-2">
               <label className="text-sm font-medium text-slate-700">SKU แพลตฟอร์ม</label>
@@ -267,7 +323,6 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
             </div>
           )}
 
-          {/* Seller SKU — ร้านตั้งเอง (optional) */}
           <div className="flex flex-col gap-1 sm:col-span-2">
             <label className="text-sm font-medium text-slate-700">
               SKU ร้านค้า <span className="font-normal text-slate-400">(ไม่บังคับ)</span>
@@ -333,6 +388,113 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
             />
           </div>
         </div>
+      </div>
+
+      {/* VelRepeat — ขายปกติยังใช้ได้คู่กัน */}
+      <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-4 sm:p-6">
+        <label className="flex cursor-pointer items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">เปิด VelRepeat (แพ็กส่งประจำ)</p>
+            <p className="text-xs text-slate-500">
+              ขายปกติยังใช้ได้ตามเดิม — เปิดแล้วลูกค้าเลือกแพ็กจ่ายก้อนเดียวได้เพิ่มบน VelShop
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            checked={velRepeatEnabled}
+            onChange={(e) => setVelRepeatEnabled(e.target.checked)}
+            className="h-4 w-4 shrink-0 accent-teal-700"
+          />
+        </label>
+
+        {velRepeatEnabled && (
+          <div className="mt-4 flex flex-col gap-3 border-t border-teal-100 pt-4">
+            <p className="text-xs font-medium text-slate-600">แผนแพ็ก</p>
+            {plans.map((plan, index) => (
+              <div
+                key={index}
+                className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-6"
+              >
+                <input
+                  value={plan.planCode}
+                  onChange={(e) => {
+                    const next = [...plans];
+                    next[index] = { ...plan, planCode: e.target.value };
+                    setPlans(next);
+                  }}
+                  placeholder="รหัส เช่น WEEKLY_4"
+                  className="rounded-md border border-slate-300 px-2 py-1.5 text-xs sm:col-span-2"
+                />
+                <select
+                  value={plan.frequency}
+                  onChange={(e) => {
+                    const next = [...plans];
+                    next[index] = {
+                      ...plan,
+                      frequency: e.target.value as PlanRow['frequency'],
+                    };
+                    setPlans(next);
+                  }}
+                  className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                >
+                  <option value="WEEKLY">รายสัปดาห์</option>
+                  <option value="BI_WEEKLY">ทุก 2 สัปดาห์</option>
+                  <option value="MONTHLY">รายเดือน</option>
+                </select>
+                <input
+                  type="number"
+                  min={1}
+                  value={plan.totalUnits}
+                  onChange={(e) => {
+                    const next = [...plans];
+                    next[index] = { ...plan, totalUnits: e.target.value };
+                    setPlans(next);
+                  }}
+                  placeholder="จำนวนชิ้น"
+                  className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  max={50}
+                  value={plan.discountPercent}
+                  onChange={(e) => {
+                    const next = [...plans];
+                    next[index] = { ...plan, discountPercent: e.target.value };
+                    setPlans(next);
+                  }}
+                  placeholder="% ส่วนลด"
+                  className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPlans(plans.filter((_, i) => i !== index))}
+                  className="text-left text-xs text-red-600 hover:underline sm:text-center"
+                >
+                  ลบ
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() =>
+                setPlans([
+                  ...plans,
+                  {
+                    planCode: '',
+                    frequency: 'MONTHLY',
+                    totalUnits: '3',
+                    discountPercent: '5',
+                    freeShipping: true,
+                  },
+                ])
+              }
+              className="w-fit text-xs font-medium text-teal-700 hover:underline"
+            >
+              + เพิ่มแผนแพ็ก
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

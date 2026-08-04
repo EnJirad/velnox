@@ -9,6 +9,15 @@ export interface PaginatedProducts {
   totalPages: number;
 }
 
+export type CatalogVelRepeatPlan = {
+  planCode: string;
+  frequency: 'WEEKLY' | 'BI_WEEKLY' | 'MONTHLY';
+  totalUnits: number;
+  unitsPerDelivery?: number;
+  discountPercent?: number;
+  freeShipping?: boolean;
+};
+
 /** Product shape สำหรับ UI Shop */
 export interface CatalogProduct extends Product {
   categoryName: string;
@@ -17,9 +26,14 @@ export interface CatalogProduct extends Product {
   rating: number;
   reviewCount: number;
   soldCount: number;
+  velRepeatEnabled?: boolean;
+  velRepeatPlans?: CatalogVelRepeatPlan[];
 }
 
-export function toCatalogProduct(p: Product): CatalogProduct {
+export function toCatalogProduct(p: Product & {
+  velRepeatEnabled?: boolean;
+  velRepeatPlans?: CatalogVelRepeatPlan[];
+}): CatalogProduct {
   const price = typeof p.price === 'string' ? Number(p.price) : Number(p.price);
   return {
     ...p,
@@ -30,6 +44,8 @@ export function toCatalogProduct(p: Product): CatalogProduct {
     rating: 0,
     reviewCount: 0,
     soldCount: 0,
+    velRepeatEnabled: p.velRepeatEnabled ?? false,
+    velRepeatPlans: p.velRepeatPlans ?? [],
   };
 }
 

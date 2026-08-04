@@ -10,6 +10,18 @@ export interface ApiCategory {
   slug: string;
 }
 
+export interface ApiVelRepeatPlan {
+  id?: string;
+  planCode: string;
+  frequency: 'WEEKLY' | 'BI_WEEKLY' | 'MONTHLY';
+  totalUnits: number;
+  unitsPerDelivery?: number;
+  discountPercent?: number;
+  freeShipping?: boolean;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
 export interface ApiProduct {
   id: string;
   shopId: string;
@@ -22,6 +34,8 @@ export interface ApiProduct {
   price: string;
   stock: number;
   status: 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
+  velRepeatEnabled?: boolean;
+  velRepeatPlans?: ApiVelRepeatPlan[];
   createdAt: string;
   images: ApiProductImage[];
   category?: ApiCategory;
