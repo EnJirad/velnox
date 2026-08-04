@@ -115,6 +115,8 @@ CREATE TABLE "products" (
   "category_id" UUID NOT NULL,
   "name"        TEXT NOT NULL,
   "slug"        TEXT NOT NULL UNIQUE,
+  "sku"         TEXT NOT NULL UNIQUE,
+  "seller_sku"  TEXT,
   "description" TEXT,
   "price"       DECIMAL(12, 2) NOT NULL,
   "stock"       INTEGER NOT NULL DEFAULT 0,
@@ -125,6 +127,8 @@ CREATE TABLE "products" (
   CONSTRAINT "products_category_id_fkey"
     FOREIGN KEY ("category_id") REFERENCES "categories"("id")
 );
+
+CREATE INDEX "products_seller_sku_idx" ON "products"("seller_sku");
 
 CREATE TABLE "product_images" (
   "id"         UUID PRIMARY KEY DEFAULT gen_random_uuid(),

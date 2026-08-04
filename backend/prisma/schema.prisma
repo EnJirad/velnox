@@ -212,6 +212,8 @@ model Product {
   categoryId  String        @map("category_id")
   name        String
   slug        String        @unique
+  sku         String        @unique
+  sellerSku   String?       @map("seller_sku")
   description String?
   price       Decimal       @db.Decimal(12, 2)
   stock       Int           @default(0)
@@ -226,6 +228,7 @@ model Product {
   orderItems             OrderItem[]
   velrepeatSubscriptions VelRepeatSubscription[]
 
+  @@index([sellerSku])
   @@map("products")
 }
 

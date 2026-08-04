@@ -2,7 +2,7 @@
 
 > อัปเดตล่าสุด: 2026-08-04 \~06:45 +07  
 > Repo: https://github.com/EnJirad/velnox.git  
-> Commit อ้างอิง: `2a18497` (center socket.io-client ^4.8.3)
+> Commit อ้างอิง: `ce0b1d7` (center socket.io-client ^4.8.3)
 
 ---
 
