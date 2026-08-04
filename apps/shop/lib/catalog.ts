@@ -33,6 +33,17 @@ export function toCatalogProduct(p: Product): CatalogProduct {
   };
 }
 
+/** decode ก่อน encode กัน double-encoding จาก useParams / URL ภาษาไทย */
+export function encodePathSegment(raw: string): string {
+  let value = raw;
+  try {
+    value = decodeURIComponent(raw);
+  } catch {
+    // already plain text
+  }
+  return encodeURIComponent(value);
+}
+
 export async function fetchCategories(): Promise<Category[]> {
   try {
     return await apiClient.get<Category[]>('/categories', { skipAuth: true });
@@ -64,7 +75,7 @@ export async function fetchProducts(params?: {
 
 export async function fetchProductBySlug(slug: string): Promise<CatalogProduct | null> {
   try {
-    const p = await apiClient.get<Product>(`/products/${encodeURIComponent(slug)}`, {
+    const p = await apiClient.get<Product>(`/products/${encodePathSegment(slug)}`, {
       skipAuth: true,
     });
     return toCatalogProduct(p);

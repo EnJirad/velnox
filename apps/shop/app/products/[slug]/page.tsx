@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams, notFound } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { formatCurrency } from '@velnox/utils';
 import { AddToCartButton } from '@/components/add-to-cart-button';
 import { VelRepeatWidget } from '@/components/velrepeat-widget';
@@ -16,26 +16,37 @@ import {
 
 export default function ProductDetailPage() {
   const params = useParams();
-  const slug = typeof params.slug === 'string' ? params.slug : '';
+  const raw = params.slug;
+  const slug = Array.isArray(raw) ? raw[0] ?? '' : typeof raw === 'string' ? raw : '';
   const [product, setProduct] = useState<CatalogProduct | null | undefined>(undefined);
   const [related, setRelated] = useState<CatalogProduct[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
     let cancelled = false;
     (async () => {
-      const p = await fetchProductBySlug(slug);
-      if (cancelled) return;
-      setProduct(p);
-      if (p?.categoryId) {
-        const res = await fetchProducts({ categoryId: p.categoryId, limit: 5 });
+      setProduct(undefined);
+      setError(null);
+      try {
+        const p = await fetchProductBySlug(slug);
         if (cancelled) return;
-        setRelated(
-          res.items
-            .filter((x) => x.id !== p.id)
-            .slice(0, 4)
-            .map(toCatalogProduct),
-        );
+        setProduct(p);
+        if (p?.categoryId) {
+          const res = await fetchProducts({ categoryId: p.categoryId, limit: 5 });
+          if (cancelled) return;
+          setRelated(
+            res.items
+              .filter((x) => x.id !== p.id)
+              .slice(0, 4)
+              .map(toCatalogProduct),
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setError('โหลดสินค้าไม่สำเร็จ กรุณาลองใหม่');
+          setProduct(null);
+        }
       }
     })();
     return () => {
@@ -52,7 +63,20 @@ export default function ProductDetailPage() {
   }
 
   if (product === null) {
-    notFound();
+    return (
+      <div className="mx-auto flex max-w-lg flex-col items-center gap-4 px-4 py-24 text-center">
+        <h1 className="text-xl font-semibold text-slate-900">ไม่พบสินค้า</h1>
+        <p className="text-sm text-slate-500">
+          {error ?? 'สินค้านี้อาจถูกลบ หรือลิงก์ไม่ถูกต้อง'}
+        </p>
+        <Link
+          href="/products"
+          className="rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
+        >
+          กลับไปหน้ารายการสินค้า
+        </Link>
+      </div>
+    );
   }
 
   return (
@@ -111,7 +135,10 @@ export default function ProductDetailPage() {
             <div className="flex-1">
               <AddToCartButton product={product} />
             </div>
-            <button className="flex-1 rounded-md bg-orange-500 py-3 text-sm font-semibold text-white transition hover:bg-orange-600">
+            <button
+              type="button"
+              className="flex-1 rounded-md bg-orange-500 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
+            >
               ซื้อเลย
             </button>
           </div>
@@ -140,7 +167,7 @@ export default function ProductDetailPage() {
             {related.map((p) => (
               <Link
                 key={p.id}
-                href={`/products/${p.slug}`}
+                href={`/products/${encodeURIComponent(p.slug)}`}
                 className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:shadow-lg"
               >
                 <div className="flex h-28 items-center justify-center bg-slate-50 text-slate-300">
