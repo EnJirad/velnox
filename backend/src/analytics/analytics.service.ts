@@ -37,8 +37,8 @@ export class AnalyticsService {
         _sum: { total: true },
         where: { paymentStatus: 'PAID' },
       }),
-      this.prisma.velRepeatSubscription.count({ where: { status: 'ACTIVE' } }),
-      this.prisma.velRepeatSubscription.count({ where: { status: 'PAUSED' } }),
+      this.prisma.velRepeatPack.count({ where: { status: 'ACTIVE' } }),
+      this.prisma.velRepeatPack.count({ where: { status: 'PAUSED' } }),
       this.prisma.order.aggregate({
         _sum: { total: true },
         where: {
