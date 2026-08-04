@@ -29,7 +29,7 @@ function computeNextDeliveryDate(
 function generateOrderNumber(): string {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `VLR-\( {timestamp}- \){random}`;
+  return `VLR-${timestamp}-${random}`;
 }
 
 @Injectable()
@@ -300,7 +300,7 @@ export class VelRepeatService {
           data: {
             packId: pack.id,
             action: remainingAfter <= 0 ? 'COMPLETED' : 'DELIVERED',
-            note: `order=\( {created.orderNumber} units= \){units} remaining=${remainingAfter}`,
+            note: `order=${created.orderNumber} units=${units} remaining=${remainingAfter}`,
           },
         });
 
