@@ -1,8 +1,9 @@
 # Velnox — AI Handoff Document
 
-> อัปเดตล่าสุด: 2026-08-04 \~22:12 +07  
+> อัปเดตล่าสุด: 2026-08-05 \~04:15 +07  
 > Repo: https://github.com/EnJirad/velnox.git  
-> Commit อ้างอิงล่าสุดที่ตรวจแล้ว: `dde0a2c` (Merchant VelRepeat UI + Shop widget ผูก product plans ครบ)
+> Commit อ้างอิงล่าสุดที่ตรวจแล้ว: `c511d8d` (โค้ด pack + Merchant/Shop UI ครบ)  
+> DB (Neon): ยืนยันมี `velrepeat_packs` / `velrepeat_deliveries` / `velrepeat_history` แล้ว (2026-08-05)
 
 ---
 
@@ -36,9 +37,9 @@
 | App | บทบาท | สถานะโดยรวม |
 |-----|--------|-------------|
 | **VelShop** (`apps/shop`) | ร้านค้าลูกค้า (Vercel) | Catalog/Auth/Orders/Checkout ✅ · VelRepeat widget ดึงแผนจาก product ✅ |
-| **VelMerchant** (`apps/merchant`) | หลังบ้านร้านค้า | สินค้า+SKU ✅ · **VelRepeat plan UI ใน product-form ✅** |
+| **VelMerchant** (`apps/merchant`) | หลังบ้านร้านค้า | สินค้า+SKU ✅ · VelRepeat plan UI ใน product-form ✅ |
 | **VelCenter** (`apps/center`) | Admin | ✅ + SKU |
-| **Backend** (`backend/`) | NestJS + Prisma (Render) | Pack API ✅ · Product plans API ✅ · **ต้อง deploy หลัง schema ล่าสุด** |
+| **Backend** (`backend/`) | NestJS + Prisma (Render) | Pack API ✅ · Product plans API ✅ · route map แล้ว |
 
 ---
 
@@ -48,15 +49,16 @@
 |--------|--------|
 | Phase 4A Product SKU | ✅ |
 | Phase 4B Catalog + Auth + Orders + Checkout | ✅ |
-| VelRepeat โมเดลเก่า (subscription รายรอบ) | ❌ เลิกใช้ — ควร DROP ตารางเก่าบน DB |
+| VelRepeat โมเดลเก่า (subscription รายรอบ) | ❌ เลิกใช้ |
 | **VelRepeat Prepaid Pack** (schema + API + cron) | ✅ |
 | Analytics นับ `velRepeatPack` | ✅ |
-| Shop UI ซื้อแพ็ก / หน้า subscriptions | ✅ (เรียก API pack) |
-| **Product.velRepeatEnabled + ProductVelRepeatPlan** | ✅ schema + DTO + products.service |
-| Neon: `vel_repeat_enabled`, `product_velrepeat_plans` | ✅ มีแล้ว |
-| Neon: `velrepeat_packs` / deliveries / history | 🔄 ต้องยืนยันว่าตรง Prisma (เคย 500 ตอนซื้อจากตาราง/history เก่า) |
-| **Merchant UI ตั้งแผนแพ็ก** | ✅ `product-form.tsx` (toggle + แผนหลายอัน + ส่ง API) |
-| **Shop widget ดึงแผนจากสินค้า** | ✅ `velrepeat-widget.tsx` ใช้ `velRepeatEnabled` + `velRepeatPlans`; ไม่มีแผน → ไม่โชว์ |
+| Shop UI ซื้อแพ็ก / หน้า subscriptions | ✅ |
+| **Product.velRepeatEnabled + ProductVelRepeatPlan** | ✅ |
+| Neon: `vel_repeat_enabled`, `product_velrepeat_plans` | ✅ |
+| Neon: `velrepeat_packs` / `deliveries` / `history` | ✅ สร้างแล้ว 2026-08-05 (เคยขาด `velrepeat_history`) |
+| **Merchant UI ตั้งแผนแพ็ก** | ✅ `product-form.tsx` |
+| **Shop widget ดึงแผนจากสินค้า** | ✅ `velrepeat-widget.tsx` |
+| ซื้อแพ็กบน production หลังแก้ตาราง | 🔄 **ต้อง smoke test หลังสร้างตาราง** |
 | Payment gateway จริงตอนซื้อแพ็ก | 📋 ยังสร้าง pack ทันที |
 | ที่อยู่จัดส่งลง Order | 📋 |
 | Support Chat + SLA | 📋 |
@@ -88,48 +90,45 @@
 |-----|------|
 | Schema | `backend/prisma/schema.prisma` |
 | Pack service | `backend/src/velrepeat/*` |
-| Product + plans | `backend/src/products/products.service.ts`, `dto/create-product.dto.ts`, `update-product.dto.ts` |
+| Product + plans | `backend/src/products/products.service.ts`, DTOs |
 | Shop widget | `apps/shop/components/velrepeat-widget.tsx` |
 | Shop store | `apps/shop/stores/velrepeat-store.ts` |
 | Shop catalog types | `apps/shop/lib/catalog.ts` |
 | Subscriptions page | `apps/shop/app/subscriptions/subscriptions-view.tsx` |
-| Merchant form | `apps/merchant/components/product-form.tsx` ✅ VelRepeat block |
-| Merchant types | `apps/merchant/lib/api-types.ts` |
+| Merchant form | `apps/merchant/components/product-form.tsx` ✅ |
+| SQL helper | `backend/prisma/vel-table.sql`, `sqleditor-new.sql` (ระวัง: เคยใช้ชื่อ `velrepeat_history_new` ผิด) |
 
 ---
 
 ## Phase ที่เสร็จแล้ว (สรุปสั้น)
 
 - Phase 1–3.5 ✅
-- Phase 4A Product SKU ✅ (DB + backend + Merchant + Center)
+- Phase 4A Product SKU ✅
 - Phase 4B Catalog + Auth + Orders + Checkout ✅
-- VelRepeat Prepaid Pack (schema + API + cron + Shop UI) ✅
-- Product plans (schema + DTO + service) ✅
-- **Merchant UI ตั้งแผน + Shop widget ผูก plans** ✅ (ตรวจแล้วใน repo ณ 2026-08-04)
+- VelRepeat Prepaid Pack (schema + API + cron + Shop/Merchant UI) ✅
+- Neon pack tables สร้างครบ (แก้ 500 จาก missing `velrepeat_history`) ✅ 2026-08-05
 
 ---
 
 ## งานถัดไป (เรียงลำดับ — ทำตามนี้)
 
-### ทันที (ops / deploy)
-1. [ ] Deploy backend ล่าสุดบน Render ให้ `prisma generate` + schema ใหม่สำเร็จ
-2. [ ] ยืนยันซื้อแพ็กบน production ได้ 200 (ถ้ายัง 500 → จัดตาราง `velrepeat_packs` / `velrepeat_deliveries` / `velrepeat_history` ให้ตรง Prisma, DROP ของเก่าถ้าจำเป็น)
-3. [ ] Smoke test: Merchant สร้าง/แก้สินค้า + เปิด VelRepeat → Shop เห็น widget + ซื้อแพ็กได้
+### ทันที
+1. [ ] **Smoke test ซื้อแพ็กบน production** หลังสร้างตาราง (login → เลือกแผน → POST packs ต้อง 200/201)
+2. [ ] ตรวจหน้า `/subscriptions` ว่าเห็นแพ็กที่ซื้อ
 
 ### โค้ดถัดไป
-4. [ ] **ที่อยู่จัดส่งใน Order / Checkout** — เก็บ address ลง Order, Checkout UI ส่งที่อยู่ (ตอนนี้ Address model มีแล้ว แต่ Order ยังไม่ผูก)
-5. [ ] Payment gateway จริงตอนซื้อแพ็ก (ตอนนี้สร้าง pack ทันทีโดยไม่ผ่าน gateway)
-6. [ ] Phase 5 Support Chat + SLA
+3. [ ] **ที่อยู่จัดส่งใน Order / Checkout** — Address model มีแล้ว แต่ Order ยังไม่ผูก
+4. [ ] Payment gateway จริงตอนซื้อแพ็ก (ตอนนี้สร้าง pack ทันที)
+5. [ ] Phase 5 Support Chat + SLA
 
 ---
 
 ## Deploy notes
 
-- **Backend (Render):** root/backend ตามที่ตั้ง — build มี `prisma generate && tsc`
+- **Backend (Render):** root/backend — build มี `prisma generate && tsc`
 - **Shop (Vercel):** ต้องมี `NEXT_PUBLIC_API_URL`
 - **CORS_ORIGINS** รวมโดเมน Shop
-- **DB (Neon):** schema pack + product plans ต้องตรง Prisma ก่อนใช้งาน production
-- หลังแก้ Prisma แล้วถ้า build พัง มักเพราะยังอ้าง model/field เก่า (เช่น `velRepeatSubscription`) — แก้ให้ชี้ pack/plan ใหม่
+- **DB (Neon):** pack tables ต้องชื่อตรง Prisma (`velrepeat_history` ไม่ใช่ `velrepeat_history_new`)
 
 ---
 
@@ -138,10 +137,10 @@
 | อาการ | สาเหตุ | ทางแก้ |
 |--------|--------|--------|
 | `Cannot POST /api/velrepeat/packs` | Backend ยังไม่ deploy โค้ด pack | Deploy Render ใหม่ |
-| Build fail `velRepeatSubscription` | analytics ยังใช้ model เก่า | ใช้ `velRepeatPack` |
-| Internal server error ตอนซื้อแพ็ก | ตาราง/history เก่าไม่ตรง (`pack_id`) | DROP ของเก่า + สร้างตาม Prisma |
-| Schema มี `ProductVelRepeatPlan` แต่ Product ไม่มี relation | generate/runtime พัง | ต้องมี `velRepeatEnabled` + `velRepeatPlans` บน Product (แก้แล้ว) |
-| HANDOFF บอก Merchant/Shop UI ยังไม่ทำ | เอกสารค้างหลังโค้ด merge | อัปเดต HANDOFF ให้ตรงโค้ด (รอบนี้) |
+| Build fail `velRepeatSubscription` | analytics ใช้ model เก่า | ใช้ `velRepeatPack` |
+| **500: table `velrepeat_history` does not exist** | SQL helper สร้างชื่อ `velrepeat_history_new` / ยังไม่รัน CREATE | สร้าง `velrepeat_history` (+ packs/deliveries) ตาม Prisma — แก้แล้ว 2026-08-05 |
+| Schema มี `ProductVelRepeatPlan` แต่ Product ไม่มี relation | generate พัง | ต้องมี `velRepeatEnabled` + `velRepeatPlans` บน Product |
+| HANDOFF ค้างสถานะ UI | เอกสารไม่ตามโค้ด | อัปเดตให้ตรง repo |
 
 ---
 

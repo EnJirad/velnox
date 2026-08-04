@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { VelRepeatService } from './velrepeat.service';
 import { CreatePackDto } from './dto/create-pack.dto';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -18,16 +18,41 @@ export class VelRepeatController {
     return this.velRepeatService.purchasePack(user.userId, dto);
   }
 
-  /** แพ็กของฉัน */
+  /** แพ็กของฉัน (ลูกค้า) */
   @Get('packs')
   findMine(@CurrentUser() user: AuthenticatedRequestUser) {
     return this.velRepeatService.findMine(user.userId);
   }
 
-  @Roles('MERCHANT', 'ADMIN', 'SUPER_ADMIN')
+  /** Admin: สรุปแพ็กทั้งแพลตฟอร์ม */
+  @Roles('ADMIN', 'SUPER_ADMIN')
   @Get('summary')
   platformSummary() {
     return this.velRepeatService.platformSummary();
+  }
+
+  /** Admin: รายการแพ็กทั้งหมด */
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Get('admin/packs')
+  listAllPacks(@Query('status') status?: string) {
+    return this.velRepeatService.listAllPacks(status);
+  }
+
+  /** Merchant: สรุปแพ็กของร้าน */
+  @Roles('MERCHANT')
+  @Get('merchant/summary')
+  merchantSummary(@CurrentUser() user: AuthenticatedRequestUser) {
+    return this.velRepeatService.merchantSummary(user.userId);
+  }
+
+  /** Merchant: รายการแพ็กของร้าน */
+  @Roles('MERCHANT')
+  @Get('merchant/packs')
+  listMerchantPacks(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Query('status') status?: string,
+  ) {
+    return this.velRepeatService.listMerchantPacks(user.userId, status);
   }
 
   @Get('packs/:id/history')

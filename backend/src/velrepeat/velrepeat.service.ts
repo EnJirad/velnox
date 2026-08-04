@@ -172,14 +172,15 @@ export class VelRepeatService {
   }
 
   /**
-   * สำหรับ Merchant / Center: นับจำนวนแพ็กตามสถานะ
+   * สำหรับ Merchant / Center: นับจำนวนแพ็กตามสถานะ + รายได้รวม
    */
   async platformSummary() {
-    const [active, paused, completed, cancelled] = await Promise.all([
+    const [active, paused, completed, cancelled, revenueAgg] = await Promise.all([
       this.prisma.velRepeatPack.count({ where: { status: 'ACTIVE' } }),
       this.prisma.velRepeatPack.count({ where: { status: 'PAUSED' } }),
       this.prisma.velRepeatPack.count({ where: { status: 'COMPLETED' } }),
       this.prisma.velRepeatPack.count({ where: { status: 'CANCELLED' } }),
+      this.prisma.velRepeatPack.aggregate({ _sum: { packPrice: true } }),
     ]);
     return {
       active,
@@ -187,7 +188,123 @@ export class VelRepeatService {
       completed,
       cancelled,
       total: active + paused + completed + cancelled,
+      totalRevenue: Number(revenueAgg._sum.packPrice ?? 0),
     };
+  }
+
+  /**
+   * Admin: รายการแพ็กทั้งหมด (filter ตาม status ได้)
+   */
+  async listAllPacks(status?: string) {
+    const where =
+      status && ['ACTIVE', 'PAUSED', 'COMPLETED', 'CANCELLED'].includes(status)
+        ? { status: status as 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED' }
+        : {};
+
+    return this.prisma.velRepeatPack.findMany({
+      where,
+      include: {
+        product: {
+          include: {
+            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            shop: { select: { id: true, name: true, merchantId: true } },
+          },
+        },
+        user: { select: { id: true, name: true, email: true } },
+        deliveries: { orderBy: { scheduledAt: 'desc' }, take: 3 },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+  }
+
+  /**
+   * Merchant: สรุปแพ็กของสินค้าในร้านตัวเอง
+   */
+  async merchantSummary(userId: string) {
+    const merchant = await this.prisma.merchant.findUnique({
+      where: { userId },
+      include: { shops: { select: { id: true } } },
+    });
+    if (!merchant || merchant.shops.length === 0) {
+      return {
+        active: 0,
+        paused: 0,
+        completed: 0,
+        cancelled: 0,
+        total: 0,
+        totalRevenue: 0,
+        remainingUnits: 0,
+      };
+    }
+
+    const shopIds = merchant.shops.map((s) => s.id);
+    const packs = await this.prisma.velRepeatPack.findMany({
+      where: { product: { shopId: { in: shopIds } } },
+      select: { status: true, packPrice: true, remainingUnits: true },
+    });
+
+    let active = 0;
+    let paused = 0;
+    let completed = 0;
+    let cancelled = 0;
+    let totalRevenue = 0;
+    let remainingUnits = 0;
+
+    for (const p of packs) {
+      totalRevenue += Number(p.packPrice);
+      remainingUnits += p.remainingUnits;
+      if (p.status === 'ACTIVE') active += 1;
+      else if (p.status === 'PAUSED') paused += 1;
+      else if (p.status === 'COMPLETED') completed += 1;
+      else if (p.status === 'CANCELLED') cancelled += 1;
+    }
+
+    return {
+      active,
+      paused,
+      completed,
+      cancelled,
+      total: packs.length,
+      totalRevenue,
+      remainingUnits,
+    };
+  }
+
+  /**
+   * Merchant: รายการแพ็กของสินค้าในร้านตัวเอง
+   */
+  async listMerchantPacks(userId: string, status?: string) {
+    const merchant = await this.prisma.merchant.findUnique({
+      where: { userId },
+      include: { shops: { select: { id: true } } },
+    });
+    if (!merchant || merchant.shops.length === 0) return [];
+
+    const shopIds = merchant.shops.map((s) => s.id);
+    const statusFilter =
+      status && ['ACTIVE', 'PAUSED', 'COMPLETED', 'CANCELLED'].includes(status)
+        ? { status: status as 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED' }
+        : {};
+
+    return this.prisma.velRepeatPack.findMany({
+      where: {
+        product: { shopId: { in: shopIds } },
+        ...statusFilter,
+      },
+      include: {
+        product: {
+          include: {
+            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            shop: { select: { id: true, name: true } },
+          },
+        },
+        user: { select: { id: true, name: true, email: true } },
+        deliveries: { orderBy: { scheduledAt: 'desc' }, take: 3 },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
   }
 
   /**
