@@ -9,8 +9,8 @@ CREATE TYPE "ShopStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'SUSPENDED');
 CREATE TYPE "ProductStatus" AS ENUM ('DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED');
 CREATE TYPE "OrderStatus" AS ENUM ('PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED');
 CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'PAID', 'FAILED', 'REFUNDED');
-CREATE TYPE "VelRepeatFrequency" AS ENUM ('WEEKLY', 'BI_WEEKLY', 'MONTHLY', 'CUSTOM');
-CREATE TYPE "VelRepeatStatus" AS ENUM ('ACTIVE', 'PAUSED', 'CANCELLED');
+CREATE TYPE "VelRepeatFrequency" AS ENUM ('WEEKLY', 'BI_WEEKLY', 'MONTHLY');
+CREATE TYPE "VelRepeatPackStatus" AS ENUM ('ACTIVE', 'PAUSED', 'COMPLETED', 'CANCELLED');
 
 -- =========================
 -- User Domain
@@ -230,9 +230,6 @@ CREATE TABLE "payments" (
 -- =========================
 -- VelRepeat Domain (Prepaid Pack)
 -- =========================
-
-CREATE TYPE "VelRepeatFrequency" AS ENUM ('WEEKLY', 'BI_WEEKLY', 'MONTHLY');
-CREATE TYPE "VelRepeatPackStatus" AS ENUM ('ACTIVE', 'PAUSED', 'COMPLETED', 'CANCELLED');
 
 CREATE TABLE "velrepeat_packs" (
   "id"                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),

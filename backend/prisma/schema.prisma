@@ -70,12 +70,12 @@ enum VelRepeatFrequency {
   WEEKLY
   BI_WEEKLY
   MONTHLY
-  CUSTOM
 }
 
-enum VelRepeatStatus {
+enum VelRepeatPackStatus {
   ACTIVE
   PAUSED
+  COMPLETED
   CANCELLED
 }
 
@@ -94,14 +94,14 @@ model User {
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
-  profile             UserProfile?
-  addresses            Address[]
-  refreshTokens        RefreshToken[]
-  merchant             Merchant?
-  orders               Order[]
-  cart                 Cart?
-  velrepeatSubscriptions VelRepeatSubscription[]
-  notifications        Notification[]
+  profile        UserProfile?
+  addresses      Address[]
+  refreshTokens  RefreshToken[]
+  merchant       Merchant?
+  orders         Order[]
+  cart           Cart?
+  velrepeatPacks VelRepeatPack[]
+  notifications  Notification[]
 
   @@map("users")
 }
@@ -220,13 +220,13 @@ model Product {
   status      ProductStatus @default(DRAFT)
   createdAt   DateTime      @default(now()) @map("created_at")
 
-  shop                   Shop                     @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  category               Category                 @relation(fields: [categoryId], references: [id])
-  images                 ProductImage[]
-  inventory              Inventory?
-  cartItems              CartItem[]
-  orderItems             OrderItem[]
-  velrepeatSubscriptions VelRepeatSubscription[]
+  shop           Shop             @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  category       Category         @relation(fields: [categoryId], references: [id])
+  images         ProductImage[]
+  inventory      Inventory?
+  cartItems      CartItem[]
+  orderItems     OrderItem[]
+  velrepeatPacks VelRepeatPack[]
 
   @@index([sellerSku])
   @@map("products")
@@ -249,11 +249,11 @@ model ProductImage {
 // -----------------------------
 
 model Inventory {
-  id                String   @id @default(uuid())
-  productId         String   @unique @map("product_id")
-  quantity          Int      @default(0)
-  reservedQuantity  Int      @default(0) @map("reserved_quantity")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(uuid())
+  productId        String   @unique @map("product_id")
+  quantity         Int      @default(0)
+  reservedQuantity Int      @default(0) @map("reserved_quantity")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -303,9 +303,10 @@ model Order {
   paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
   createdAt     DateTime      @default(now()) @map("created_at")
 
-  user    User        @relation(fields: [userId], references: [id])
-  items   OrderItem[]
-  payment Payment?
+  user              User               @relation(fields: [userId], references: [id])
+  items             OrderItem[]
+  payment           Payment?
+  velrepeatDelivery VelRepeatDelivery?
 
   @@map("orders")
 }
@@ -349,44 +350,31 @@ model Payment {
 // VelRepeat Domain (Prepaid Pack)
 // -----------------------------
 
-enum VelRepeatFrequency {
-  WEEKLY
-  BI_WEEKLY
-  MONTHLY
-}
-
-enum VelRepeatPackStatus {
-  ACTIVE
-  PAUSED
-  COMPLETED
-  CANCELLED
-}
-
 /// แพ็กที่ลูกค้าซื้อ (จ่ายก้อนเดียว)
 model VelRepeatPack {
   id               String              @id @default(uuid())
   userId           String              @map("user_id")
   productId        String              @map("product_id")
 
-  planCode         String              @map("plan_code")   // e.g. WEEKLY_4, MONTHLY_3
+  planCode         String              @map("plan_code") // e.g. WEEKLY_4, MONTHLY_3
   frequency        VelRepeatFrequency
-  totalUnits       Int                 @map("total_units") // จำนวนชิ้นทั้งหมดในแพ็ก
+  totalUnits       Int                 @map("total_units")
   remainingUnits   Int                 @map("remaining_units")
   unitsPerDelivery Int                 @default(1) @map("units_per_delivery")
 
-  unitPrice        Decimal             @db.Decimal(12, 2) @map("unit_price") // ราคาต่อชิ้นในแพ็ก
-  packPrice        Decimal             @db.Decimal(12, 2) @map("pack_price") // ยอดที่จ่ายจริง
+  unitPrice        Decimal             @db.Decimal(12, 2) @map("unit_price")
+  packPrice        Decimal             @db.Decimal(12, 2) @map("pack_price")
   freeShipping     Boolean             @default(true) @map("free_shipping")
 
   status           VelRepeatPackStatus @default(ACTIVE)
   nextDeliveryDate DateTime            @map("next_delivery_date")
-  prepaidPaymentId String?             @map("prepaid_payment_id") // อ้างอิง payment ก้อนเดียว
+  prepaidPaymentId String?             @map("prepaid_payment_id")
 
   createdAt        DateTime            @default(now()) @map("created_at")
   updatedAt        DateTime            @updatedAt @map("updated_at")
 
-  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product    Product                @relation(fields: [productId], references: [id])
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product    Product             @relation(fields: [productId], references: [id])
   deliveries VelRepeatDelivery[]
   history    VelRepeatHistory[]
 
@@ -399,7 +387,7 @@ model VelRepeatPack {
 model VelRepeatDelivery {
   id          String    @id @default(uuid())
   packId      String    @map("pack_id")
-  orderId     String?   @unique @map("order_id") // order ที่สร้างเพื่อส่งของ (paymentStatus = PAID)
+  orderId     String?   @unique @map("order_id")
   units       Int       @default(1)
   scheduledAt DateTime  @map("scheduled_at")
   deliveredAt DateTime? @map("delivered_at")
@@ -414,7 +402,7 @@ model VelRepeatDelivery {
 model VelRepeatHistory {
   id        String   @id @default(uuid())
   packId    String   @map("pack_id")
-  action    String   // PURCHASED | DELIVERED | PAUSED | RESUMED | CANCELLED | COMPLETED | SKIPPED_OUT_OF_STOCK
+  action    String // PURCHASED | DELIVERED | PAUSED | RESUMED | CANCELLED | COMPLETED | SKIPPED_OUT_OF_STOCK
   note      String?
   createdAt DateTime @default(now()) @map("created_at")
 

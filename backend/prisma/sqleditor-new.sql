@@ -10,8 +10,13 @@ EXCEPTION
   WHEN duplicate_object THEN NULL;
 END \];
 
--- ปรับ VelRepeatFrequency ถ้ายังมี CUSTOM อยู่ (optional — ข้ามได้ถ้ายังใช้ CUSTOM)
--- ถ้า enum เดิมมี CUSTOM และไม่อยากเก็บไว้ ค่อยจัดการทีหลัง
+-- หมายเหตุ: VelRepeatFrequency ควรมีอยู่แล้วจาก schema เดิม
+-- ถ้ายังไม่มี ให้รัน:
+-- DO \[ BEGIN
+--   CREATE TYPE "VelRepeatFrequency" AS ENUM ('WEEKLY', 'BI_WEEKLY', 'MONTHLY');
+-- EXCEPTION
+--   WHEN duplicate_object THEN NULL;
+-- END \];
 
 -- 2) ตารางแพ็ก (จ่ายก้อนเดียว)
 CREATE TABLE IF NOT EXISTS "velrepeat_packs" (
@@ -59,6 +64,7 @@ CREATE TABLE IF NOT EXISTS "velrepeat_deliveries" (
 );
 
 -- 4) History ใหม่ (ผูกกับ pack)
+-- ใช้ชื่อ velrepeat_history_new ก่อน ถ้ายังมีตารางเก่าอยู่
 CREATE TABLE IF NOT EXISTS "velrepeat_history_new" (
   "id"         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "pack_id"    UUID NOT NULL,
