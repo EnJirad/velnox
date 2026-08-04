@@ -24,7 +24,7 @@ export class OrdersService {
     private readonly events: EventsGateway,
   ) {}
 
-  async createFromCart(userId: string) {
+  async createFromCart(userId: string, paymentMethod: string = 'promptpay') {
     const cart = await this.prisma.cart.findUnique({
       where: { userId },
       include: { items: { include: { product: true } } },
@@ -73,9 +73,17 @@ export class OrdersService {
               }),
             ),
           },
+          payment: {
+            create: {
+              method: paymentMethod,
+              amount: total,
+              status: 'PENDING',
+            },
+          },
         },
         include: {
           items: { include: { product: { select: { id: true, name: true } } } },
+          payment: true,
           user: { select: { id: true, name: true, email: true } },
         },
       });
@@ -101,7 +109,21 @@ export class OrdersService {
   findMine(userId: string) {
     return this.prisma.order.findMany({
       where: { userId },
-      include: { items: { include: { product: true } } },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+              },
+            },
+          },
+        },
+        payment: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
   }

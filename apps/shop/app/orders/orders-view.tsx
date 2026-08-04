@@ -4,8 +4,14 @@ import { useEffect, useState } from 'react';
 import { formatCurrency, formatDate } from '@velnox/utils';
 import type { Order } from '@velnox/types';
 import { Badge } from '@velnox/ui';
-import { fetchMyOrders, orderStatusLabel, orderStatusTone } from '@/lib/orders';
+import {
+  fetchMyOrders,
+  orderStatusLabel,
+  orderStatusTone,
+  paymentMethodLabel,
+} from '@/lib/orders';
 import { ApiError } from '@/lib/api-client';
+import { IconBox } from '@/components/icons';
 
 export function OrdersView() {
   const [orders, setOrders] = useState<Order[] | null>(null);
@@ -66,13 +72,46 @@ export function OrdersView() {
                   {orderStatusLabel[order.status]}
                 </Badge>
               </div>
-              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm text-slate-500">
+
+              {order.items && order.items.length > 0 && (
+                <ul className="mt-3 flex flex-col gap-2 border-b border-slate-50 pb-3">
+                  {order.items.map((item) => {
+                    const img = item.product?.images?.[0]?.url;
+                    return (
+                      <li key={item.id} className="flex items-center gap-3 text-sm">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-50 text-slate-300">
+                          {img ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={img} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <IconBox size={18} />
+                          )}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-slate-700">
+                          {item.product?.name ?? 'สินค้า'} × {item.quantity}
+                        </span>
+                        <span className="shrink-0 font-medium text-slate-800">
+                          {formatCurrency(Number(item.price) * item.quantity)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
+                <div>
                   ยอดรวม{' '}
                   <span className="font-semibold text-teal-700">
                     {formatCurrency(Number(order.total))}
                   </span>
-                  {' · '}การชำระเงิน{' '}
+                  {order.payment?.method && (
+                    <>
+                      {' · '}
+                      {paymentMethodLabel[order.payment.method] ?? order.payment.method}
+                    </>
+                  )}
+                  {' · '}
                   <span
                     className={
                       order.paymentStatus === 'PAID'

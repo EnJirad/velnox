@@ -8,6 +8,13 @@ export type OrderStatus =
 
 export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
 
+export interface OrderItemProduct {
+  id: string;
+  name: string;
+  slug?: string;
+  images?: { url: string }[];
+}
+
 export interface OrderItem {
   id: string;
   orderId: string;
@@ -15,6 +22,16 @@ export interface OrderItem {
   merchantId: string;
   quantity: number;
   price: number;
+  product?: OrderItemProduct;
+}
+
+export interface OrderPayment {
+  id: string;
+  method: string;
+  amount: number;
+  status: PaymentStatus;
+  transactionId?: string | null;
+  paidAt?: string | null;
 }
 
 export interface Order {
@@ -27,5 +44,6 @@ export interface Order {
   total: number;
   paymentStatus: PaymentStatus;
   items?: OrderItem[];
+  payment?: OrderPayment | null;
   createdAt: string;
 }

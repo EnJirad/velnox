@@ -23,6 +23,12 @@ export const orderStatusTone: Record<
   CANCELLED: 'danger',
 };
 
+export const paymentMethodLabel: Record<string, string> = {
+  promptpay: 'พร้อมเพย์',
+  card: 'บัตรเครดิต/เดบิต',
+  cod: 'เก็บเงินปลายทาง',
+};
+
 export async function fetchMyOrders(): Promise<Order[]> {
   return apiClient.get<Order[]>('/orders/me');
 }
@@ -31,12 +37,14 @@ export async function fetchMyOrders(): Promise<Order[]> {
  * Sync client-side cart → backend cart, then create order from server cart.
  * Backend checkout reads the authenticated user's server cart only.
  */
-export async function checkoutFromClientCart(items: CartItem[]): Promise<Order> {
+export async function checkoutFromClientCart(
+  items: CartItem[],
+  paymentMethod: 'promptpay' | 'card' | 'cod' = 'promptpay',
+): Promise<Order> {
   if (items.length === 0) {
     throw new Error('ตะกร้าว่าง');
   }
 
-  // Reset server cart then mirror local items
   await apiClient.delete('/cart');
   for (const item of items) {
     await apiClient.post('/cart/items', {
@@ -45,5 +53,5 @@ export async function checkoutFromClientCart(items: CartItem[]): Promise<Order> 
     });
   }
 
-  return apiClient.post<Order>('/orders/checkout');
+  return apiClient.post<Order>('/orders/checkout', { paymentMethod });
 }

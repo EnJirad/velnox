@@ -85,7 +85,7 @@ export function CheckoutView() {
     setError(null);
     setSubmitting(true);
     try {
-      const order = await checkoutFromClientCart(items);
+      const order = await checkoutFromClientCart(items, payment);
       clear();
       setPlaced(order.orderNumber);
     } catch (err) {

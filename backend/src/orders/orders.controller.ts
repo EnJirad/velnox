@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { CheckoutDto } from './dto/checkout.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthenticatedRequestUser } from '../auth/types/authenticated-request-user';
@@ -10,8 +11,8 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post('checkout')
-  checkout(@CurrentUser() user: AuthenticatedRequestUser) {
-    return this.ordersService.createFromCart(user.userId);
+  checkout(@CurrentUser() user: AuthenticatedRequestUser, @Body() dto: CheckoutDto) {
+    return this.ordersService.createFromCart(user.userId, dto.paymentMethod);
   }
 
   @Get('me')
