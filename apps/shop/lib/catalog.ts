@@ -54,7 +54,7 @@ export async function fetchProducts(params?: {
   if (params?.page) qs.set('page', String(params.page));
   if (params?.limit) qs.set('limit', String(params.limit ?? 20));
   if (params?.sort) qs.set('sort', params.sort);
-  const path = `/products\( {qs.toString() ? `? \){qs}` : ''}`;
+  const path = '/products' + (qs.toString() ? '?' + qs.toString() : '');
   try {
     return await apiClient.get<PaginatedProducts>(path, { skipAuth: true });
   } catch {
