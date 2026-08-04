@@ -16,6 +16,8 @@ export interface ApiProduct {
   categoryId: string;
   name: string;
   slug: string;
+  sku: string;
+  sellerSku?: string | null;
   description: string | null;
   price: string;
   stock: number;
@@ -50,21 +52,4 @@ export interface ApiOrderItem {
     total: string;
     createdAt: string;
   };
-}
-
-export interface ApiProduct {
-  id: string;
-  shopId: string;
-  categoryId: string;
-  name: string;
-  slug: string;
-  sku: string;
-  sellerSku?: string | null;
-  description: string | null;
-  price: string;
-  stock: number;
-  status: 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
-  createdAt: string;
-  images: ApiProductImage[];
-  category?: ApiCategory;
 }

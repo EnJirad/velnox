@@ -25,7 +25,7 @@ function generateSku(): string {
     .toString(36)
     .toUpperCase()
     .padStart(2, '0');
-  return `VLX-P-\( {ts} \){rand}`;
+  return `VLX-P-${ts}${rand}`;
 }
 
 @Injectable()
