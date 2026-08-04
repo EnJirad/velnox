@@ -125,7 +125,7 @@ export class ProductsService {
   async createForUser(userId: string, dto: CreateProductDto) {
     const shopId = await this.getOwnedShopId(userId);
     const baseSlug = slugify(dto.name);
-    const slug = `\( {baseSlug}- \){Date.now().toString(36)}`;
+    const slug = `${baseSlug}-${Date.now().toString(36)}`;
     const status = await this.resolveNewProductStatus();
     const sku = await this.ensureUniqueSku();
 
