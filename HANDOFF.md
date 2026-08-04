@@ -1,8 +1,8 @@
 # Velnox — AI Handoff Document
 
-> อัปเดตล่าสุด: 2026-08-04 \~09:45 +07  
+> อัปเดตล่าสุด: 2026-08-04 \~10:45 +07  
 > Repo: https://github.com/EnJirad/velnox.git  
-> Commit อ้างอิง: `0b1a19a` (Phase 4A Product SKU — backend complete)
+> Commit อ้างอิง: ล่าสุดบน main (Phase 4A Product SKU ครบ Backend + Merchant + Center)
 
 ---
 
@@ -15,7 +15,9 @@
 | Center `socket.io-client` + lockfile align | ✅ |
 | Deploy Render/Vercel ผ่านจริง | ⏳ ยืนยันหลัง build ล่าสุด |
 | **Product SKU — Backend** | ✅ schema + migration + auto-gen + search |
-| **Product SKU — UI แสดงผล** | 🔜 Merchant form/list, Center, Shop |
+| **Product SKU — Merchant UI** | ✅ form (sellerSku) + list โชว์ SKU |
+| **Product SKU — Center UI** | ✅ list + ค้นหาด้วย SKU |
+| **Product SKU — Shop แสดง** | 📋 optional / คู่ Phase 4B |
 | **VelShop ต่อ API (เลิก mock)** | 🔜 งานหลักถัดไป |
 | **Support Chat + SLA 3 วัน** | 📋 วางแผนแล้ว — ยังไม่ลงมือ |
 
@@ -25,10 +27,10 @@
 
 | App | สถานะ |
 |-----|--------|
-| VelCenter | ✅ พร้อม (ยืนยัน deploy) |
-| VelMerchant | ✅ มีแล้ว — รอโชว์ SKU ใน form/list |
+| VelCenter | ✅ พร้อม + แสดง/ค้นหา SKU |
+| VelMerchant | ✅ พร้อม + form/list SKU |
 | VelShop | 🔄 UI + mock → ต้องต่อ API |
-| Backend | ✅ foundation + admin + WS + **SKU** |
+| Backend | ✅ foundation + admin + WS + SKU |
 
 ---
 
@@ -38,27 +40,29 @@
 - Phase 2 Admin Users ✅  
 - Phase 3 Admin Shops ✅  
 - Phase 3.5 Orders detail + WebSocket + Reports ✅  
-- **Phase 4A Product SKU (Backend)** ✅  
-  - Prisma: `sku` unique, `sellerSku` optional  
+- **Phase 4A Product SKU ✅**  
+  - Prisma: `sku` unique, `sellerSku` optional + index  
+  - SQL migration + backfill สินค้าเก่า  
   - Auto-generate `VLX-P-` + base36(+rand) ตอนสร้าง  
-  - Backfill สินค้าเก่า (SQL Editor)  
   - Search: name / sku / sellerSku  
-  - DTO + types อัปเดตแล้ว  
+  - DTO + shared types  
+  - Merchant: form (sellerSku, โชว์ platform SKU ตอน edit) + list  
+  - Center: คอลัมน์ SKU + ค้นหาชื่อ/SKU/ร้าน  
 
 ---
 
 ## งานถัดไป (เรียงลำดับ)
 
-### ตอนนี้ — ปิด Phase 4A UI + smoke test
-- [ ] Restart/redeploy backend หลัง `0b1a19a`
-- [ ] ทดสอบสร้างสินค้า → ตรวจ `sku` ใน DB
-- [ ] Merchant form: ช่อง `sellerSku` + โชว์ `sku` (read-only ตอน edit)
-- [ ] Merchant products list แสดง SKU
-- [ ] Center products: แสดง SKU + ค้นหาด้วย SKU
-- [ ] (optional) Shop product detail แสดง SKU
+### ตอนนี้ — ปิด deploy + smoke test SKU
+- [ ] ยืนยัน Render backend build ผ่าน (หลัง SKU commits)
+- [ ] ยืนยัน Vercel Center / Merchant build ผ่าน
+- [ ] ทดสอบสร้างสินค้า → ได้ `sku` ใน DB
+- [ ] ทดสอบใส่ `sellerSku` จาก Merchant แล้วเห็นใน list / Center
+- [ ] ค้นหา SKU ใน Center เจอสินค้า
 
 ### Phase 4B — VelShop ต่อ API (งานหลัก)
 - [ ] Catalog: `GET /products`, `GET /products/:slug`, categories
+- [ ] แสดง SKU บนหน้า product detail (ถ้าต้องการ)
 - [ ] Auth ลูกค้า
 - [ ] Cart → Checkout → Orders/me
 - [ ] เลิกพึ่ง `mock-data`
@@ -74,12 +78,13 @@
 
 ---
 
-## ออกแบบย่อ — SKU (implemented backend)
+## ออกแบบย่อ — SKU (implemented)
 
-- `sku`: unique, auto `VLX-P-` + base36 + 2 random chars  
-- `sellerSku`: optional จากร้าน (ร้านใส่ผ่าน API ได้แล้ว — รอ UI)  
-- ค้นหา: name OR sku OR sellerSku  
-- ห้ามแก้ `sku` จาก client ตอน update  
+- `sku`: unique, auto `VLX-P-` + base36 + 2 random chars — ห้ามแก้จาก client  
+- `sellerSku`: optional จากร้าน (Merchant form)  
+- ค้นหา backend: name OR sku OR sellerSku  
+- แสดง: Merchant list/form, Center products  
+- ใช้ในซัพพอร์ต/ออเดอร์แทน UUID (Phase 5)  
 
 ## ออกแบบย่อ — Chat
 
@@ -93,7 +98,7 @@
 ## Deploy notes
 
 - Backend Render: `pnpm install && pnpm build` / `pnpm start:prod`  
-- หลัง deploy ต้องมีคอลัมน์ `sku` / `seller_sku` บน products (รัน SQL แล้ว)  
+- DB ต้องมีคอลัมน์ `products.sku` (NOT NULL UNIQUE) และ `products.seller_sku`  
 - monorepo: ต้อง sync `pnpm-lock.yaml` กับทุก `package.json`  
 - `CORS_ORIGINS` รวม Center + Shop + Merchant  
 - Center ต้องมี `socket.io-client`  
@@ -103,8 +108,7 @@
 
 ## ลำดับที่แนะนำให้ทีมทำจริง
 
-1. Redeploy backend + ทดสอบสร้างสินค้า (ตรวจ SKU ใน DB)  
-2. Merchant form/list โชว์ SKU + ช่อง sellerSku  
-3. Center แสดง/ค้นหา SKU  
-4. VelShop catalog → auth → cart/checkout  
-5. Chat foundation → SLA UI → realtime
+1. Redeploy backend + Center + Merchant → smoke test SKU  
+2. **Phase 4B** VelShop catalog → auth → cart/checkout → เลิก mock  
+3. (optional) โชว์ SKU บน Shop product detail  
+4. Phase 5 Chat foundation → SLA UI → realtime

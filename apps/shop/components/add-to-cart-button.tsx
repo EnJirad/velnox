@@ -2,14 +2,14 @@
 
 import { useState } from 'react';
 import { useCartStore } from '@/stores/cart-store';
-import type { MockProduct } from '@/lib/mock-data';
+import type { CatalogProduct } from '@/lib/catalog';
 
 export function AddToCartButton({
   product,
   compact = false,
   quantity = 1,
 }: {
-  product: MockProduct;
+  product: CatalogProduct;
   compact?: boolean;
   quantity?: number;
 }) {
@@ -22,9 +22,9 @@ export function AddToCartButton({
         productId: product.id,
         name: product.name,
         price: product.price,
-        emoji: product.emoji,
         shopName: product.shopName,
         stock: product.stock,
+        imageUrl: product.imageUrl,
       },
       quantity,
     );
@@ -41,7 +41,7 @@ export function AddToCartButton({
           : 'w-full rounded-md bg-teal-700 py-3 text-sm font-semibold text-white transition hover:bg-teal-800'
       }
     >
-      {added ? '✓ เพิ่มลงตะกร้าแล้ว' : compact ? 'เพิ่มลงตะกร้า' : '🛒 เพิ่มลงตะกร้า'}
+      {added ? 'เพิ่มลงตะกร้าแล้ว' : compact ? 'เพิ่มลงตะกร้า' : 'เพิ่มลงตะกร้า'}
     </button>
   );
 }

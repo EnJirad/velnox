@@ -7,6 +7,7 @@ import { useCartCount } from '@/stores/cart-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useLanguage } from '@/components/providers/language-provider';
 import { LanguageSwitcher } from './language-switcher';
+import { IconCart, IconClose, IconMenu, IconUser } from '@/components/icons';
 
 export function Navigation() {
   const cartCount = useCartCount();
@@ -33,24 +34,30 @@ export function Navigation() {
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="border-b border-slate-100 bg-teal-700 text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-1.5 text-xs">
-          <span>🚚 ส่งฟรีทุกออเดอร์ตั้งแต่ 990 บาทขึ้นไป</span>
+          <span>ส่งฟรีทุกออเดอร์ตั้งแต่ 990 บาทขึ้นไป</span>
           <div className="hidden gap-4 sm:flex">
-            <Link href="/orders" className="hover:underline">{t('nav.orders')}</Link>
+            <Link href="/orders" className="hover:underline">
+              {t('nav.orders')}
+            </Link>
             <span>ช่วยเหลือ · 02-000-0000</span>
           </div>
         </div>
       </div>
+
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
         <button
+          type="button"
           onClick={() => setMenuOpen((v) => !v)}
           className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100 sm:hidden"
           aria-label="Menu"
         >
-          {menuOpen ? '✕' : '☰'}
+          {menuOpen ? <IconClose /> : <IconMenu />}
         </button>
 
         <Link href="/" className="flex items-center gap-2 text-xl font-bold text-teal-700">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-700 text-white">V</span>
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-700 text-white">
+            V
+          </span>
           <span>VelShop</span>
         </Link>
 
@@ -84,8 +91,12 @@ export function Navigation() {
           <div className="hidden sm:block">
             <LanguageSwitcher />
           </div>
-          <Link href="/cart" className="relative flex items-center hover:text-teal-700">
-            <span className="text-xl">🛒</span>
+          <Link
+            href="/cart"
+            className="relative flex items-center text-slate-700 hover:text-teal-700"
+            aria-label="Cart"
+          >
+            <IconCart size={22} />
             {cartCount > 0 && (
               <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[11px] font-semibold text-white">
                 {cartCount}
@@ -94,6 +105,7 @@ export function Navigation() {
           </Link>
         </nav>
       </div>
+
       <div className="border-t border-slate-100 bg-slate-50 md:hidden">
         <form className="mx-auto flex max-w-6xl px-4 py-2" onSubmit={(e) => e.preventDefault()}>
           <input
@@ -105,7 +117,6 @@ export function Navigation() {
         </form>
       </div>
 
-      {/* Mobile menu drawer */}
       {menuOpen && (
         <div className="border-t border-slate-200 bg-white sm:hidden">
           <nav className="flex flex-col divide-y divide-slate-100 text-sm font-medium text-slate-700">
@@ -114,8 +125,12 @@ export function Navigation() {
                 {link.label}
               </Link>
             ))}
-            <Link href={accountHref} className="px-4 py-3 hover:bg-slate-50">
-              {user ? `👤 ${accountLabel}` : `🔑 ${accountLabel}`}
+            <Link
+              href={accountHref}
+              className="flex items-center gap-2 px-4 py-3 hover:bg-slate-50"
+            >
+              <IconUser size={16} />
+              {accountLabel}
             </Link>
             <div className="flex items-center justify-between px-4 py-3">
               <span className="text-slate-500">{t('nav.language')}</span>

@@ -8,7 +8,7 @@ export interface Subscription {
   id: string;
   productId: string;
   productName: string;
-  emoji: string;
+  imageUrl?: string;
   price: number;
   frequency: VelRepeatFrequency;
   quantity: number;
@@ -31,7 +31,7 @@ interface VelRepeatState {
   subscribe: (input: {
     productId: string;
     productName: string;
-    emoji: string;
+    imageUrl?: string;
     price: number;
     frequency: VelRepeatFrequency;
     quantity: number;
@@ -47,7 +47,7 @@ export const useVelRepeatStore = create<VelRepeatState>()(
       subscriptions: [],
       subscribe: (input) => {
         const newSub: Subscription = {
-          id: `sub-${Date.now()}`,
+          id: 'sub-' + Date.now(),
           ...input,
           status: 'ACTIVE',
           nextOrderDate: computeNextOrderDate(input.frequency),
@@ -57,17 +57,23 @@ export const useVelRepeatStore = create<VelRepeatState>()(
       },
       pause: (id) =>
         set({
-          subscriptions: get().subscriptions.map((s) => (s.id === id ? { ...s, status: 'PAUSED' } : s)),
+          subscriptions: get().subscriptions.map((s) =>
+            s.id === id ? { ...s, status: 'PAUSED' } : s,
+          ),
         }),
       resume: (id) =>
         set({
           subscriptions: get().subscriptions.map((s) =>
-            s.id === id ? { ...s, status: 'ACTIVE', nextOrderDate: computeNextOrderDate(s.frequency) } : s,
+            s.id === id
+              ? { ...s, status: 'ACTIVE', nextOrderDate: computeNextOrderDate(s.frequency) }
+              : s,
           ),
         }),
       cancel: (id) =>
         set({
-          subscriptions: get().subscriptions.map((s) => (s.id === id ? { ...s, status: 'CANCELLED' } : s)),
+          subscriptions: get().subscriptions.map((s) =>
+            s.id === id ? { ...s, status: 'CANCELLED' } : s,
+          ),
         }),
     }),
     { name: 'velnox-shop-velrepeat' },

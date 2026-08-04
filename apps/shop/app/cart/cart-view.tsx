@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { formatCurrency } from '@velnox/utils';
 import { useCartStore } from '@/stores/cart-store';
+import { IconBox, IconCart } from '@/components/icons';
 
 export function CartView() {
   const items = useCartStore((s) => s.items);
@@ -16,10 +17,15 @@ export function CartView() {
   if (items.length === 0) {
     return (
       <div className="mx-auto flex max-w-2xl flex-col items-center gap-4 px-4 py-24 text-center">
-        <span className="text-6xl">🛒</span>
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+          <IconCart size={32} />
+        </span>
         <h1 className="text-xl font-semibold text-slate-900">ตะกร้าของคุณว่างเปล่า</h1>
         <p className="text-sm text-slate-500">เลือกช้อปสินค้าที่ใช่ แล้วกลับมาที่นี่อีกครั้ง</p>
-        <Link href="/products" className="rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800">
+        <Link
+          href="/products"
+          className="rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
+        >
           เริ่มช้อปเลย
         </Link>
       </div>
@@ -28,18 +34,26 @@ export function CartView() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-semibold text-slate-900">ตะกร้าสินค้า ({items.length} รายการ)</h1>
+      <h1 className="mb-6 text-xl font-semibold text-slate-900">
+        ตะกร้าสินค้า ({items.length} รายการ)
+      </h1>
       <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
           {items.map((item) => (
             <div key={item.productId} className="flex items-center gap-4 p-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-3xl">
-                {item.emoji}
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50 text-slate-300">
+                {item.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <IconBox size={24} />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-slate-900">{item.name}</p>
                 <p className="text-xs text-slate-500">{item.shopName}</p>
                 <button
+                  type="button"
                   onClick={() => removeItem(item.productId)}
                   className="mt-1 text-xs text-red-600 hover:underline"
                 >
@@ -48,6 +62,7 @@ export function CartView() {
               </div>
               <div className="flex items-center rounded-md border border-slate-300">
                 <button
+                  type="button"
                   onClick={() => setQuantity(item.productId, item.quantity - 1)}
                   className="px-2.5 py-1 text-sm text-slate-600 hover:bg-slate-50"
                 >
@@ -55,6 +70,7 @@ export function CartView() {
                 </button>
                 <span className="w-8 text-center text-sm">{item.quantity}</span>
                 <button
+                  type="button"
                   onClick={() => setQuantity(item.productId, item.quantity + 1)}
                   className="px-2.5 py-1 text-sm text-slate-600 hover:bg-slate-50"
                   disabled={item.quantity >= item.stock}

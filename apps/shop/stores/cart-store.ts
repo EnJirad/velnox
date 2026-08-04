@@ -5,10 +5,10 @@ export interface CartItem {
   productId: string;
   name: string;
   price: number;
-  emoji: string;
   shopName: string;
   quantity: number;
   stock: number;
+  imageUrl?: string;
 }
 
 interface CartState {
@@ -41,7 +41,9 @@ export const useCartStore = create<CartState>()(
       setQuantity: (productId, quantity) =>
         set({
           items: get().items.map((i) =>
-            i.productId === productId ? { ...i, quantity: Math.max(1, Math.min(quantity, i.stock)) } : i,
+            i.productId === productId
+              ? { ...i, quantity: Math.max(1, Math.min(quantity, i.stock)) }
+              : i,
           ),
         }),
       clear: () => set({ items: [] }),
