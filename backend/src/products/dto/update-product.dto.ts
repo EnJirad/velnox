@@ -21,6 +21,10 @@ export class UpdateProductDto {
   stock?: number;
 
   @IsOptional()
+  @IsString()
+  sellerSku?: string;
+
+  @IsOptional()
   @IsIn(['DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED'])
   status?: 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
 }

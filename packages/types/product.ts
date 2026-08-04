@@ -17,16 +17,28 @@ export interface ProductImage {
   sortOrder: number;
 }
 
+export interface ProductShop {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+}
+
 export interface Product {
   id: string;
   shopId: string;
   categoryId: string;
   name: string;
   slug: string;
+  /** Platform SKU e.g. VLX-P-XXXX */
+  sku: string;
+  /** Optional seller SKU */
+  sellerSku?: string | null;
   description: string | null;
   price: number;
   stock: number;
   status: ProductStatus;
   images?: ProductImage[];
+  category?: Category;
+  shop?: ProductShop;
   createdAt: string;
 }

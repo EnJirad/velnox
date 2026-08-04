@@ -18,6 +18,16 @@ function slugify(input: string): string {
     .replace(/-+/g, '-');
 }
 
+/** Platform SKU: VLX-P- + base36 timestamp + 2 random chars */
+function generateSku(): string {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rand = Math.floor(Math.random() * 1296)
+    .toString(36)
+    .toUpperCase()
+    .padStart(2, '0');
+  return `VLX-P-\( {ts} \){rand}`;
+}
+
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -31,7 +41,13 @@ export class ProductsService {
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.shopId ? { shopId: query.shopId } : {}),
       ...(query.search
-        ? { name: { contains: query.search, mode: 'insensitive' as const } }
+        ? {
+            OR: [
+              { name: { contains: query.search, mode: 'insensitive' as const } },
+              { sku: { contains: query.search, mode: 'insensitive' as const } },
+              { sellerSku: { contains: query.search, mode: 'insensitive' as const } },
+            ],
+          }
         : {}),
     };
 
@@ -96,11 +112,22 @@ export class ProductsService {
     return 'ACTIVE';
   }
 
+  private async ensureUniqueSku(): Promise<string> {
+    let sku = generateSku();
+    for (let i = 0; i < 5; i++) {
+      const exists = await this.prisma.product.findUnique({ where: { sku } });
+      if (!exists) return sku;
+      sku = generateSku();
+    }
+    return generateSku();
+  }
+
   async createForUser(userId: string, dto: CreateProductDto) {
     const shopId = await this.getOwnedShopId(userId);
     const baseSlug = slugify(dto.name);
-    const slug = `${baseSlug}-${Date.now().toString(36)}`;
+    const slug = `\( {baseSlug}- \){Date.now().toString(36)}`;
     const status = await this.resolveNewProductStatus();
+    const sku = await this.ensureUniqueSku();
 
     return this.prisma.product.create({
       data: {
@@ -108,6 +135,8 @@ export class ProductsService {
         categoryId: dto.categoryId,
         name: dto.name,
         slug,
+        sku,
+        sellerSku: dto.sellerSku?.trim() || null,
         description: dto.description,
         price: dto.price,
         stock: dto.stock,
@@ -141,7 +170,27 @@ export class ProductsService {
     if (!product || product.shopId !== shopId) {
       throw new ForbiddenException('You do not own this product');
     }
-    return this.prisma.product.update({ where: { id: productId }, data: dto });
+
+    const data: {
+      name?: string;
+      description?: string;
+      price?: number;
+      stock?: number;
+      status?: 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
+      sellerSku?: string | null;
+    } = {};
+
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.description !== undefined) data.description = dto.description;
+    if (dto.price !== undefined) data.price = dto.price;
+    if (dto.stock !== undefined) data.stock = dto.stock;
+    if (dto.status !== undefined) data.status = dto.status;
+    if (dto.sellerSku !== undefined) {
+      data.sellerSku = dto.sellerSku?.trim() || null;
+    }
+    // sku ไม่ให้แก้จาก client
+
+    return this.prisma.product.update({ where: { id: productId }, data });
   }
 
   async removeOwned(userId: string, productId: string) {

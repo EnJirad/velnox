@@ -20,6 +20,11 @@ export class CreateProductDto {
   @Min(0)
   stock!: number;
 
+  /** Optional seller-defined SKU */
+  @IsOptional()
+  @IsString()
+  sellerSku?: string;
+
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
