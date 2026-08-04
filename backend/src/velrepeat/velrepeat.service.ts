@@ -1,12 +1,15 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { CreateSubscriptionDto } from './dto/create-subscription.dto';
-import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
+import { CreatePackDto } from './dto/create-pack.dto';
 
-function computeNextOrderDate(
+function computeNextDeliveryDate(
   from: Date,
-  frequency: 'WEEKLY' | 'BI_WEEKLY' | 'MONTHLY' | 'CUSTOM',
-  customIntervalDays?: number,
+  frequency: 'WEEKLY' | 'BI_WEEKLY' | 'MONTHLY',
 ): Date {
   const next = new Date(from);
   switch (frequency) {
@@ -19,20 +22,14 @@ function computeNextOrderDate(
     case 'MONTHLY':
       next.setMonth(next.getMonth() + 1);
       break;
-    case 'CUSTOM':
-      next.setDate(next.getDate() + (customIntervalDays ?? 30));
-      break;
   }
   return next;
 }
 
-const SHIPPING_FEE = 40;
-const FREE_SHIPPING_THRESHOLD = 990;
-
 function generateOrderNumber(): string {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `VLR-${timestamp}-${random}`;
+  return `VLR-\( {timestamp}- \){random}`;
 }
 
 @Injectable()
@@ -41,191 +38,284 @@ export class VelRepeatService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async subscribe(userId: string, dto: CreateSubscriptionDto) {
-    const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
+  /**
+   * ซื้อแพ็ก (จ่ายก้อนเดียว) → สร้าง VelRepeatPack + history PURCHASED
+   * หมายเหตุ: payment gateway จริงยังไม่ต่อ — รับ prepaidPaymentId จาก client ได้
+   */
+  async purchasePack(userId: string, dto: CreatePackDto) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: dto.productId },
+      include: { shop: true },
+    });
     if (!product || product.status !== 'ACTIVE') {
       throw new NotFoundException('Product not found');
     }
-    if (dto.frequency === 'CUSTOM' && !dto.customIntervalDays) {
-      throw new BadRequestException('customIntervalDays is required for CUSTOM frequency');
+
+    const unitsPerDelivery = dto.unitsPerDelivery ?? 1;
+    if (dto.totalUnits < unitsPerDelivery) {
+      throw new BadRequestException('totalUnits must be >= unitsPerDelivery');
     }
 
-    const nextOrderDate = computeNextOrderDate(new Date(), dto.frequency, dto.customIntervalDays);
+    const nextDeliveryDate = computeNextDeliveryDate(new Date(), dto.frequency);
 
-    const subscription = await this.prisma.velRepeatSubscription.create({
-      data: {
-        userId,
-        productId: dto.productId,
-        frequency: dto.frequency,
-        quantity: dto.quantity,
-        status: 'ACTIVE',
-        nextOrderDate,
-      },
+    const pack = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.velRepeatPack.create({
+        data: {
+          userId,
+          productId: dto.productId,
+          planCode: dto.planCode,
+          frequency: dto.frequency,
+          totalUnits: dto.totalUnits,
+          remainingUnits: dto.totalUnits,
+          unitsPerDelivery,
+          unitPrice: dto.unitPrice,
+          packPrice: dto.packPrice,
+          freeShipping: dto.freeShipping ?? true,
+          status: 'ACTIVE',
+          nextDeliveryDate,
+          prepaidPaymentId: dto.prepaidPaymentId,
+        },
+        include: {
+          product: { include: { images: true, shop: true } },
+        },
+      });
+
+      await tx.velRepeatHistory.create({
+        data: {
+          packId: created.id,
+          action: 'PURCHASED',
+          note: `plan=\( {dto.planCode} units= \){dto.totalUnits} packPrice=${dto.packPrice}`,
+        },
+      });
+
+      return created;
     });
 
-    await this.prisma.velRepeatHistory.create({
-      data: { subscriptionId: subscription.id, action: 'SUBSCRIBED' },
-    });
-
-    return subscription;
+    return pack;
   }
 
   findMine(userId: string) {
-    return this.prisma.velRepeatSubscription.findMany({
+    return this.prisma.velRepeatPack.findMany({
       where: { userId },
-      include: { product: { include: { images: true, shop: true } } },
+      include: {
+        product: { include: { images: true, shop: true } },
+        deliveries: { orderBy: { scheduledAt: 'desc' }, take: 5 },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   private async getOwned(userId: string, id: string) {
-    const subscription = await this.prisma.velRepeatSubscription.findUnique({ where: { id } });
-    if (!subscription || subscription.userId !== userId) {
-      throw new NotFoundException('Subscription not found');
+    const pack = await this.prisma.velRepeatPack.findUnique({ where: { id } });
+    if (!pack || pack.userId !== userId) {
+      throw new NotFoundException('Pack not found');
     }
-    return subscription;
+    return pack;
   }
 
   async pause(userId: string, id: string) {
-    await this.getOwned(userId, id);
-    await this.prisma.velRepeatHistory.create({ data: { subscriptionId: id, action: 'PAUSED' } });
-    return this.prisma.velRepeatSubscription.update({ where: { id }, data: { status: 'PAUSED' } });
+    const pack = await this.getOwned(userId, id);
+    if (pack.status !== 'ACTIVE') {
+      throw new BadRequestException('Only ACTIVE packs can be paused');
+    }
+    await this.prisma.velRepeatHistory.create({
+      data: { packId: id, action: 'PAUSED' },
+    });
+    return this.prisma.velRepeatPack.update({
+      where: { id },
+      data: { status: 'PAUSED' },
+    });
   }
 
   async resume(userId: string, id: string) {
-    const subscription = await this.getOwned(userId, id);
-    const nextOrderDate = computeNextOrderDate(new Date(), subscription.frequency);
-    await this.prisma.velRepeatHistory.create({ data: { subscriptionId: id, action: 'RESUMED' } });
-    return this.prisma.velRepeatSubscription.update({
+    const pack = await this.getOwned(userId, id);
+    if (pack.status !== 'PAUSED') {
+      throw new BadRequestException('Only PAUSED packs can be resumed');
+    }
+    if (pack.remainingUnits <= 0) {
+      throw new BadRequestException('Pack has no remaining units');
+    }
+    const nextDeliveryDate = computeNextDeliveryDate(new Date(), pack.frequency);
+    await this.prisma.velRepeatHistory.create({
+      data: { packId: id, action: 'RESUMED' },
+    });
+    return this.prisma.velRepeatPack.update({
       where: { id },
-      data: { status: 'ACTIVE', nextOrderDate },
+      data: { status: 'ACTIVE', nextDeliveryDate },
     });
   }
 
   async cancel(userId: string, id: string) {
-    await this.getOwned(userId, id);
-    await this.prisma.velRepeatHistory.create({ data: { subscriptionId: id, action: 'CANCELLED' } });
-    return this.prisma.velRepeatSubscription.update({ where: { id }, data: { status: 'CANCELLED' } });
-  }
-
-  async update(userId: string, id: string, dto: UpdateSubscriptionDto) {
-    const subscription = await this.getOwned(userId, id);
-    const frequency = dto.frequency ?? subscription.frequency;
-    const nextOrderDate = dto.frequency
-      ? computeNextOrderDate(new Date(), frequency, dto.customIntervalDays)
-      : subscription.nextOrderDate;
-
+    const pack = await this.getOwned(userId, id);
+    if (pack.status === 'CANCELLED' || pack.status === 'COMPLETED') {
+      throw new BadRequestException('Pack is already closed');
+    }
     await this.prisma.velRepeatHistory.create({
-      data: { subscriptionId: id, action: 'UPDATED' },
-    });
-
-    return this.prisma.velRepeatSubscription.update({
-      where: { id },
       data: {
-        frequency,
-        quantity: dto.quantity ?? subscription.quantity,
-        nextOrderDate,
+        packId: id,
+        action: 'CANCELLED',
+        note: `remainingUnits=${pack.remainingUnits}`,
       },
+    });
+    return this.prisma.velRepeatPack.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
     });
   }
 
   async history(userId: string, id: string) {
     await this.getOwned(userId, id);
     return this.prisma.velRepeatHistory.findMany({
-      where: { subscriptionId: id },
+      where: { packId: id },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   /**
-   * Admin/ops visibility: platform-wide subscription counts, used by
-   * VelMerchant ("จำนวน VelRepeat") and VelCenter analytics per
-   * docs/01_Project_Overview.md section 7 and 8.
+   * สำหรับ Merchant / Center: นับจำนวนแพ็กตามสถานะ
    */
   async platformSummary() {
-    const [active, paused, cancelled] = await Promise.all([
-      this.prisma.velRepeatSubscription.count({ where: { status: 'ACTIVE' } }),
-      this.prisma.velRepeatSubscription.count({ where: { status: 'PAUSED' } }),
-      this.prisma.velRepeatSubscription.count({ where: { status: 'CANCELLED' } }),
+    const [active, paused, completed, cancelled] = await Promise.all([
+      this.prisma.velRepeatPack.count({ where: { status: 'ACTIVE' } }),
+      this.prisma.velRepeatPack.count({ where: { status: 'PAUSED' } }),
+      this.prisma.velRepeatPack.count({ where: { status: 'COMPLETED' } }),
+      this.prisma.velRepeatPack.count({ where: { status: 'CANCELLED' } }),
     ]);
-    return { active, paused, cancelled, total: active + paused + cancelled };
+    return {
+      active,
+      paused,
+      completed,
+      cancelled,
+      total: active + paused + completed + cancelled,
+    };
   }
 
   /**
-   * Core VelRepeat engine: runs on a schedule (see VelRepeatCronService).
-   * Finds subscriptions due today or earlier, creates an Order for each,
-   * decrements stock, advances nextOrderDate, and logs history so the
-   * customer/merchant/admin dashboards can all see what happened.
+   * Cron engine: หา pack ที่ถึงวันส่ง + ยังมีเครดิต
+   * → สร้าง Order (paymentStatus = PAID, shipping ตาม freeShipping)
+   * → ลด remainingUnits / stock
+   * → บันทึก delivery + history
+   * → ถ้า remaining = 0 → COMPLETED
    */
-  async processDueSubscriptions(now: Date = new Date()) {
-    const due = await this.prisma.velRepeatSubscription.findMany({
-      where: { status: 'ACTIVE', nextOrderDate: { lte: now } },
+  async processDuePacks(now: Date = new Date()) {
+    const due = await this.prisma.velRepeatPack.findMany({
+      where: {
+        status: 'ACTIVE',
+        nextDeliveryDate: { lte: now },
+        remainingUnits: { gt: 0 },
+      },
       include: { product: { include: { shop: true } } },
     });
 
-    const results: { subscriptionId: string; orderId?: string; skipped?: string }[] = [];
+    const results: {
+      packId: string;
+      orderId?: string;
+      skipped?: string;
+      completed?: boolean;
+    }[] = [];
 
-    for (const sub of due) {
-      if (sub.product.stock < sub.quantity) {
+    for (const pack of due) {
+      const units = Math.min(pack.unitsPerDelivery, pack.remainingUnits);
+
+      if (pack.product.stock < units) {
         // eslint-disable-next-line no-await-in-loop
         await this.prisma.velRepeatHistory.create({
-          data: { subscriptionId: sub.id, action: 'SKIPPED_OUT_OF_STOCK' },
+          data: {
+            packId: pack.id,
+            action: 'SKIPPED_OUT_OF_STOCK',
+            note: `needed=\( {units} stock= \){pack.product.stock}`,
+          },
         });
-        results.push({ subscriptionId: sub.id, skipped: 'OUT_OF_STOCK' });
+        results.push({ packId: pack.id, skipped: 'OUT_OF_STOCK' });
         continue;
       }
 
-      const subtotal = Number(sub.product.price) * sub.quantity;
-      const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+      const subtotal = Number(pack.unitPrice) * units;
+      const shippingFee = pack.freeShipping ? 0 : 40;
       const total = subtotal + shippingFee;
+      const remainingAfter = pack.remainingUnits - units;
+      const nextDeliveryDate =
+        remainingAfter > 0
+          ? computeNextDeliveryDate(now, pack.frequency)
+          : pack.nextDeliveryDate;
 
       // eslint-disable-next-line no-await-in-loop
       const order = await this.prisma.$transaction(async (tx) => {
         const created = await tx.order.create({
           data: {
-            userId: sub.userId,
+            userId: pack.userId,
             orderNumber: generateOrderNumber(),
-            status: 'PENDING',
+            status: 'CONFIRMED',
             subtotal,
             shippingFee,
             total,
-            paymentStatus: 'PENDING',
+            paymentStatus: 'PAID', // prepaid แล้ว
             items: {
               create: [
                 {
-                  productId: sub.productId,
-                  merchantId: sub.product.shop.merchantId,
-                  quantity: sub.quantity,
-                  price: sub.product.price,
+                  productId: pack.productId,
+                  merchantId: pack.product.shop.merchantId,
+                  quantity: units,
+                  price: pack.unitPrice,
                 },
               ],
+            },
+            payment: {
+              create: {
+                method: 'velrepeat_prepaid',
+                amount: total,
+                status: 'PAID',
+                paidAt: now,
+                transactionId: pack.prepaidPaymentId ?? `PACK-${pack.id}`,
+              },
             },
           },
         });
 
         await tx.product.update({
-          where: { id: sub.productId },
-          data: { stock: { decrement: sub.quantity } },
+          where: { id: pack.productId },
+          data: { stock: { decrement: units } },
         });
 
-        const nextOrderDate = computeNextOrderDate(now, sub.frequency);
-        await tx.velRepeatSubscription.update({
-          where: { id: sub.id },
-          data: { nextOrderDate },
+        await tx.velRepeatDelivery.create({
+          data: {
+            packId: pack.id,
+            orderId: created.id,
+            units,
+            scheduledAt: pack.nextDeliveryDate,
+            deliveredAt: now,
+          },
+        });
+
+        await tx.velRepeatPack.update({
+          where: { id: pack.id },
+          data: {
+            remainingUnits: remainingAfter,
+            nextDeliveryDate,
+            status: remainingAfter <= 0 ? 'COMPLETED' : 'ACTIVE',
+          },
         });
 
         await tx.velRepeatHistory.create({
-          data: { subscriptionId: sub.id, action: `ORDER_CREATED:${created.orderNumber}` },
+          data: {
+            packId: pack.id,
+            action: remainingAfter <= 0 ? 'COMPLETED' : 'DELIVERED',
+            note: `order=\( {created.orderNumber} units= \){units} remaining=${remainingAfter}`,
+          },
         });
 
         return created;
       });
 
-      results.push({ subscriptionId: sub.id, orderId: order.id });
+      results.push({
+        packId: pack.id,
+        orderId: order.id,
+        completed: remainingAfter <= 0,
+      });
     }
 
     if (results.length > 0) {
-      this.logger.log(`VelRepeat: processed ${results.length} due subscription(s)`);
+      this.logger.log(`VelRepeat: processed ${results.length} due pack(s)`);
     }
 
     return results;
