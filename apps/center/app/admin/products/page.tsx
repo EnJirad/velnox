@@ -10,6 +10,8 @@ import type { ProductStatus } from '@velnox/types';
 type ApiProduct = {
   id: string;
   name: string;
+  sku?: string;
+  sellerSku?: string | null;
   price: number | string;
   status: ProductStatus;
   shop?: { name: string };
@@ -44,11 +46,15 @@ export default function ProductsPage() {
     }
   }
 
+  const q = search.toLowerCase().trim();
   const filtered = products.filter(
     (p) =>
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.id.toLowerCase().includes(search.toLowerCase()) ||
-      (p.shop?.name ?? '').toLowerCase().includes(search.toLowerCase()),
+      !q ||
+      p.name.toLowerCase().includes(q) ||
+      p.id.toLowerCase().includes(q) ||
+      (p.sku ?? '').toLowerCase().includes(q) ||
+      (p.sellerSku ?? '').toLowerCase().includes(q) ||
+      (p.shop?.name ?? '').toLowerCase().includes(q),
   );
   const draftCount = products.filter((p) => p.status === 'DRAFT').length;
 
@@ -64,7 +70,7 @@ export default function ProductsPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="ค้นหาชื่อ / ID / ร้าน..."
+          placeholder="ค้นหาชื่อ / SKU / ร้าน..."
           className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
         />
       </div>
@@ -81,6 +87,7 @@ export default function ProductsPage() {
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs text-slate-500">
                 <th className="px-4 py-3 font-medium">สินค้า</th>
+                <th className="px-4 py-3 font-medium">SKU</th>
                 <th className="px-4 py-3 font-medium">ร้านค้า</th>
                 <th className="px-4 py-3 font-medium">ราคา</th>
                 <th className="px-4 py-3 font-medium">สถานะ</th>
@@ -90,7 +97,7 @@ export default function ProductsPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400">
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
                     ยังไม่มีสินค้าในระบบ
                   </td>
                 </tr>
@@ -111,10 +118,15 @@ export default function ProductsPage() {
                             —
                           </span>
                         )}
-                        <div>
-                          <span className="font-medium text-slate-800">{p.name}</span>
-                          <p className="text-[10px] text-slate-400">{p.id}</p>
-                        </div>
+                        <span className="font-medium text-slate-800">{p.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-mono text-xs text-slate-600">{p.sku ?? '—'}</span>
+                        {p.sellerSku && (
+                          <span className="text-[10px] text-slate-400">ร้าน: {p.sellerSku}</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-500">{p.shop?.name ?? '—'}</td>
