@@ -110,6 +110,12 @@ export function ProductsView() {
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium text-slate-900">{p.name}</p>
+                    {p.sku && (
+                      <p className="mt-0.5 font-mono text-[10px] text-slate-400">{p.sku}</p>
+                    )}
+                    {p.sellerSku && (
+                      <p className="text-[10px] text-slate-400">ร้าน: {p.sellerSku}</p>
+                    )}
                     <p className="mt-0.5 text-sm font-semibold text-teal-700">
                       {formatCurrency(Number(p.price))}
                     </p>
@@ -147,6 +153,7 @@ export function ProductsView() {
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs text-slate-500">
                   <th className="px-4 py-3 font-medium">สินค้า</th>
+                  <th className="px-4 py-3 font-medium">SKU</th>
                   <th className="px-4 py-3 font-medium">ราคา</th>
                   <th className="px-4 py-3 font-medium">สต็อก</th>
                   <th className="px-4 py-3 font-medium">สถานะ</th>
@@ -174,6 +181,14 @@ export function ProductsView() {
                           </span>
                         )}
                         <span className="font-medium text-slate-800">{p.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-mono text-xs text-slate-600">{p.sku ?? '—'}</span>
+                        {p.sellerSku && (
+                          <span className="text-[10px] text-slate-400">ร้าน: {p.sellerSku}</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-800">

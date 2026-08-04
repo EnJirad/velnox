@@ -24,6 +24,7 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
   const [description, setDescription] = useState(initial?.description ?? '');
   const [price, setPrice] = useState(initial ? String(initial.price) : '');
   const [stock, setStock] = useState(initial ? String(initial.stock) : '');
+  const [sellerSku, setSellerSku] = useState(initial?.sellerSku ?? '');
   const [status, setStatus] = useState<ApiProduct['status']>(initial?.status ?? 'ACTIVE');
   const [images, setImages] = useState<{ url: string }[]>(
     initial?.images?.map((img) => ({ url: img.url })) ?? [],
@@ -33,7 +34,6 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Search categories while typing (shared tags style)
   useEffect(() => {
     const q = categoryQuery.trim();
     if (!q) {
@@ -51,7 +51,6 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
     return () => clearTimeout(timer);
   }, [categoryQuery]);
 
-  // Close suggestion dropdown when clicking outside
   useEffect(() => {
     function onPointerDown(e: MouseEvent) {
       if (categoryBoxRef.current && !categoryBoxRef.current.contains(e.target as Node)) {
@@ -89,7 +88,6 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
     setShowSuggestions(false);
   }
 
-  /** Reuse existing category or create a shared one by name. */
   async function resolveCategoryId(): Promise<string> {
     if (categoryId) return categoryId;
 
@@ -116,6 +114,7 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
     setSaving(true);
     try {
       const resolvedCategoryId = await resolveCategoryId();
+      const sellerSkuValue = sellerSku.trim() || undefined;
 
       if (mode === 'create') {
         await apiClient.post('/products', {
@@ -124,6 +123,7 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
           description: description.trim() || undefined,
           price: Number(price),
           stock: Number(stock),
+          sellerSku: sellerSkuValue,
           imageUrls: images.map((img) => img.url),
         });
       } else if (productId) {
@@ -133,7 +133,7 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
           price: Number(price),
           stock: Number(stock),
           status,
-          // category can be updated if backend allows; resolve if user changed it
+          sellerSku: sellerSku.trim() || '',
           ...(resolvedCategoryId ? { categoryId: resolvedCategoryId } : {}),
         });
       }
@@ -252,6 +252,34 @@ export function ProductForm({ mode, productId, initial }: ProductFormProps) {
             {categoryId && (
               <p className="text-xs text-teal-700">เลือกแล้ว: #{categoryQuery}</p>
             )}
+          </div>
+
+          {/* Platform SKU — โชว์ตอนแก้ไขเท่านั้น (ระบบเจนอัตโนมัติ) */}
+          {mode === 'edit' && initial?.sku && (
+            <div className="flex flex-col gap-1 sm:col-span-2">
+              <label className="text-sm font-medium text-slate-700">SKU แพลตฟอร์ม</label>
+              <input
+                readOnly
+                value={initial.sku}
+                className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-600 outline-none"
+              />
+              <p className="text-xs text-slate-400">ระบบสร้างให้อัตโนมัติ — แก้ไขไม่ได้</p>
+            </div>
+          )}
+
+          {/* Seller SKU — ร้านตั้งเอง (optional) */}
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <label className="text-sm font-medium text-slate-700">
+              SKU ร้านค้า <span className="font-normal text-slate-400">(ไม่บังคับ)</span>
+            </label>
+            <input
+              value={sellerSku}
+              onChange={(e) => setSellerSku(e.target.value)}
+              placeholder="เช่น SHIRT-RED-M / รหัสสต็อกของคุณ"
+              maxLength={64}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
+            />
+            <p className="text-xs text-slate-400">ใช้ผูกกับคลัง / Excel / บาร์โค้ดของร้านคุณ</p>
           </div>
 
           {mode === 'edit' && (
