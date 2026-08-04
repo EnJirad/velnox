@@ -2,23 +2,55 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { formatCurrency, generateOrderNumber } from '@velnox/utils';
+import Link from 'next/link';
+import { formatCurrency } from '@velnox/utils';
 import { useCartStore } from '@/stores/cart-store';
+import { useAuthStore } from '@/stores/auth-store';
+import { useAuthContext } from '@/components/providers/auth-provider';
+import { checkoutFromClientCart } from '@/lib/orders';
+import { ApiError } from '@/lib/api-client';
+import { IconBox } from '@/components/icons';
 
 const STEPS = ['ที่อยู่จัดส่ง', 'วิธีการชำระเงิน', 'ยืนยันคำสั่งซื้อ'];
 
 export function CheckoutView() {
   const router = useRouter();
+  const { isInitializing } = useAuthContext();
+  const user = useAuthStore((s) => s.user);
   const items = useCartStore((s) => s.items);
   const clear = useCartStore((s) => s.clear);
   const [step, setStep] = useState(0);
   const [payment, setPayment] = useState<'card' | 'promptpay' | 'cod'>('promptpay');
   const [address, setAddress] = useState({ name: '', phone: '', line: '', city: '', postal: '' });
   const [placed, setPlaced] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const shipping = subtotal >= 990 || subtotal === 0 ? 0 : 40;
   const total = subtotal + shipping;
+
+  if (isInitializing) {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-24 text-center text-sm text-slate-500">
+        กำลังโหลด...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="mx-auto flex max-w-xl flex-col items-center gap-4 px-4 py-24 text-center">
+        <p className="text-slate-600">กรุณาเข้าสู่ระบบก่อนชำระเงิน</p>
+        <Link
+          href="/login?redirect=/checkout"
+          className="rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
+        >
+          เข้าสู่ระบบ
+        </Link>
+      </div>
+    );
+  }
 
   if (items.length === 0 && !placed) {
     return (
@@ -31,12 +63,15 @@ export function CheckoutView() {
   if (placed) {
     return (
       <div className="mx-auto flex max-w-xl flex-col items-center gap-3 px-4 py-24 text-center">
-        <span className="text-6xl">🎉</span>
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+          <IconBox size={32} />
+        </span>
         <h1 className="text-xl font-semibold text-slate-900">สั่งซื้อสำเร็จแล้ว!</h1>
         <p className="text-sm text-slate-500">
           เลขที่คำสั่งซื้อของคุณคือ <span className="font-semibold text-teal-700">{placed}</span>
         </p>
         <button
+          type="button"
           onClick={() => router.push('/orders')}
           className="mt-3 rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
         >
@@ -44,6 +79,26 @@ export function CheckoutView() {
         </button>
       </div>
     );
+  }
+
+  async function handlePlaceOrder() {
+    setError(null);
+    setSubmitting(true);
+    try {
+      const order = await checkoutFromClientCart(items);
+      clear();
+      setPlaced(order.orderNumber);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'สั่งซื้อไม่สำเร็จ กรุณาลองใหม่',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -60,11 +115,23 @@ export function CheckoutView() {
             >
               {i + 1}
             </div>
-            <span className={`hidden whitespace-nowrap sm:inline ${i <= step ? 'font-medium text-slate-900' : 'text-slate-400'}`}>{s}</span>
-            {i < STEPS.length - 1 && <div className="mx-1 h-px w-5 shrink-0 bg-slate-300 sm:mx-2 sm:w-8" />}
+            <span
+              className={`hidden whitespace-nowrap sm:inline ${
+                i <= step ? 'font-medium text-slate-900' : 'text-slate-400'
+              }`}
+            >
+              {s}
+            </span>
+            {i < STEPS.length - 1 && (
+              <div className="mx-1 h-px w-5 shrink-0 bg-slate-300 sm:mx-2 sm:w-8" />
+            )}
           </div>
         ))}
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
         <div className="rounded-xl border border-slate-200 bg-white p-6">
@@ -106,6 +173,7 @@ export function CheckoutView() {
                 />
               </div>
               <button
+                type="button"
                 onClick={() => setStep(1)}
                 className="mt-2 w-fit rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
               >
@@ -117,11 +185,13 @@ export function CheckoutView() {
           {step === 1 && (
             <div className="flex flex-col gap-3">
               <h2 className="mb-1 text-sm font-semibold text-slate-900">เลือกวิธีการชำระเงิน</h2>
-              {[
-                { key: 'promptpay', label: 'พร้อมเพย์ / QR Code', icon: '📱' },
-                { key: 'card', label: 'บัตรเครดิต / เดบิต', icon: '💳' },
-                { key: 'cod', label: 'เก็บเงินปลายทาง', icon: '💵' },
-              ].map((m) => (
+              {(
+                [
+                  { key: 'promptpay' as const, label: 'พร้อมเพย์ / QR Code' },
+                  { key: 'card' as const, label: 'บัตรเครดิต / เดบิต' },
+                  { key: 'cod' as const, label: 'เก็บเงินปลายทาง' },
+                ] as const
+              ).map((m) => (
                 <label
                   key={m.key}
                   className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm ${
@@ -132,20 +202,21 @@ export function CheckoutView() {
                     type="radio"
                     name="payment"
                     checked={payment === m.key}
-                    onChange={() => setPayment(m.key as typeof payment)}
+                    onChange={() => setPayment(m.key)}
                   />
-                  <span>{m.icon}</span>
                   <span className="font-medium text-slate-800">{m.label}</span>
                 </label>
               ))}
               <div className="mt-2 flex gap-3">
                 <button
+                  type="button"
                   onClick={() => setStep(0)}
                   className="rounded-md border border-slate-300 px-6 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   ย้อนกลับ
                 </button>
                 <button
+                  type="button"
                   onClick={() => setStep(2)}
                   className="rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
                 >
@@ -165,28 +236,40 @@ export function CheckoutView() {
               </div>
               <ul className="flex flex-col gap-2 text-sm text-slate-600">
                 {items.map((i) => (
-                  <li key={i.productId} className="flex justify-between">
-                    <span>{i.emoji} {i.name} × {i.quantity}</span>
-                    <span>{formatCurrency(i.price * i.quantity)}</span>
+                  <li key={i.productId} className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded bg-slate-100 text-slate-300">
+                        {i.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={i.imageUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <IconBox size={16} />
+                        )}
+                      </span>
+                      <span className="truncate">
+                        {i.name} × {i.quantity}
+                      </span>
+                    </span>
+                    <span className="shrink-0">{formatCurrency(i.price * i.quantity)}</span>
                   </li>
                 ))}
               </ul>
               <div className="flex gap-3">
                 <button
+                  type="button"
                   onClick={() => setStep(1)}
-                  className="rounded-md border border-slate-300 px-6 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  disabled={submitting}
+                  className="rounded-md border border-slate-300 px-6 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                 >
                   ย้อนกลับ
                 </button>
                 <button
-                  onClick={() => {
-                    const orderNumber = generateOrderNumber();
-                    clear();
-                    setPlaced(orderNumber);
-                  }}
-                  className="rounded-md bg-orange-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+                  type="button"
+                  onClick={handlePlaceOrder}
+                  disabled={submitting}
+                  className="rounded-md bg-orange-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-60"
                 >
-                  ยืนยันการสั่งซื้อ
+                  {submitting ? 'กำลังสั่งซื้อ...' : 'ยืนยันการสั่งซื้อ'}
                 </button>
               </div>
             </div>
@@ -196,8 +279,14 @@ export function CheckoutView() {
         <div className="h-fit rounded-xl border border-slate-200 bg-white p-5">
           <h2 className="mb-4 text-sm font-semibold text-slate-900">สรุปยอด</h2>
           <div className="flex flex-col gap-2 text-sm text-slate-600">
-            <div className="flex justify-between"><span>ยอดรวมสินค้า</span><span>{formatCurrency(subtotal)}</span></div>
-            <div className="flex justify-between"><span>ค่าจัดส่ง</span><span>{shipping === 0 ? 'ฟรี' : formatCurrency(shipping)}</span></div>
+            <div className="flex justify-between">
+              <span>ยอดรวมสินค้า</span>
+              <span>{formatCurrency(subtotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>ค่าจัดส่ง</span>
+              <span>{shipping === 0 ? 'ฟรี' : formatCurrency(shipping)}</span>
+            </div>
           </div>
           <div className="my-3 border-t border-dashed border-slate-200" />
           <div className="flex justify-between text-base font-bold text-slate-900">

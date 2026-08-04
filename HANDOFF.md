@@ -1,8 +1,8 @@
 # Velnox — AI Handoff Document
 
-> อัปเดตล่าสุด: 2026-08-04 \~10:45 +07  
+> อัปเดตล่าสุด: 2026-08-04 ~11:35 +07  
 > Repo: https://github.com/EnJirad/velnox.git  
-> Commit อ้างอิง: ล่าสุดบน main (Phase 4A Product SKU ครบ Backend + Merchant + Center)
+> Commit อ้างอิง: `871c30f` + local Phase 4B Auth/Orders/Checkout (ยังไม่ push — GitHub write 403)
 
 ---
 
@@ -10,16 +10,17 @@
 
 | รายการ | สถานะ |
 |--------|--------|
-| VelCenter admin ครบ (users, merchants, shops, products, orders detail, reports, WS) | ✅ โค้ดครบ |
-| Backend WS deps + order number fix | ✅ |
-| Center `socket.io-client` + lockfile align | ✅ |
-| Deploy Render/Vercel ผ่านจริง | ⏳ ยืนยันหลัง build ล่าสุด |
-| **Product SKU — Backend** | ✅ schema + migration + auto-gen + search |
-| **Product SKU — Merchant UI** | ✅ form (sellerSku) + list โชว์ SKU |
-| **Product SKU — Center UI** | ✅ list + ค้นหาด้วย SKU |
-| **Product SKU — Shop แสดง** | 📋 optional / คู่ Phase 4B |
-| **VelShop ต่อ API (เลิก mock)** | 🔜 งานหลักถัดไป |
-| **Support Chat + SLA 3 วัน** | 📋 วางแผนแล้ว — ยังไม่ลงมือ |
+| VelCenter admin ครบ | ✅ |
+| Product SKU Backend | ✅ schema + auto-gen + search + migration |
+| Product SKU Merchant UI | ✅ form sellerSku + list SKU |
+| Product SKU Center UI | ✅ คอลัมน์ SKU + ค้นหา |
+| **VelShop Catalog ต่อ API** | ✅ โค้ดแล้ว (`catalog.ts` path แก้แล้วบน main) |
+| **VelShop Auth** | ✅ login/register/restore ต่อ API อยู่แล้ว |
+| **VelShop Orders** | ✅ ดึง `GET /orders/me` (ไฟล์ local รอ commit) |
+| **VelShop Checkout** | ✅ sync cart → `POST /orders/checkout` (ไฟล์ local รอ commit) |
+| Cart ยัง client-side (zustand) | 🔄 sync ตอน checkout เท่านั้น |
+| Support Chat + SLA | 📋 ยังไม่ลงมือ |
+| Deploy ยืนยันหลัง 4B | ⏳ |
 
 ---
 
@@ -27,88 +28,81 @@
 
 | App | สถานะ |
 |-----|--------|
-| VelCenter | ✅ พร้อม + แสดง/ค้นหา SKU |
-| VelMerchant | ✅ พร้อม + form/list SKU |
-| VelShop | 🔄 UI + mock → ต้องต่อ API |
-| Backend | ✅ foundation + admin + WS + SKU |
+| VelCenter | ✅ + แสดง/ค้นหา SKU |
+| VelMerchant | ✅ + SKU form/list |
+| VelShop | 🔄 Catalog API ✅ · Auth ✅ · Orders/Checkout ต่อ API (รอ push) · Cart client-side |
+| Backend | ✅ + SKU + cart + checkout จาก server cart |
 
 ---
 
 ## Phase ที่เสร็จแล้ว
 
-- Phase 1 Platform Settings ✅  
-- Phase 2 Admin Users ✅  
-- Phase 3 Admin Shops ✅  
-- Phase 3.5 Orders detail + WebSocket + Reports ✅  
-- **Phase 4A Product SKU ✅**  
-  - Prisma: `sku` unique, `sellerSku` optional + index  
-  - SQL migration + backfill สินค้าเก่า  
-  - Auto-generate `VLX-P-` + base36(+rand) ตอนสร้าง  
-  - Search: name / sku / sellerSku  
-  - DTO + shared types  
-  - Merchant: form (sellerSku, โชว์ platform SKU ตอน edit) + list  
-  - Center: คอลัมน์ SKU + ค้นหาชื่อ/SKU/ร้าน  
+- Phase 1–3.5 ✅  
+- **Phase 4A Product SKU** ✅ (DB + backend + Merchant + Center)  
+- **Phase 4B Catalog** ✅  
+  - `apps/shop/lib/catalog.ts` → GET categories / products / by slug  
+  - Home, products list, product detail เลิก mock  
+  - Inline SVG icons (ไม่มี emoji) เหมือน Center  
+  - Cart / VelRepeat ใช้ `imageUrl` แทน emoji  
 
 ---
 
 ## งานถัดไป (เรียงลำดับ)
 
-### ตอนนี้ — ปิด deploy + smoke test SKU
-- [ ] ยืนยัน Render backend build ผ่าน (หลัง SKU commits)
-- [ ] ยืนยัน Vercel Center / Merchant build ผ่าน
-- [ ] ทดสอบสร้างสินค้า → ได้ `sku` ใน DB
-- [ ] ทดสอบใส่ `sellerSku` จาก Merchant แล้วเห็นใน list / Center
-- [ ] ค้นหา SKU ใน Center เจอสินค้า
+### ทันที
+- [ ] **Commit/push** ไฟล์ Phase 4B ด้านล่าง (GitHub integration ตอนนี้ write ไม่ได้)
+- [ ] ตั้ง `NEXT_PUBLIC_API_URL` บน Vercel Shop → backend จริง
+- [ ] Redeploy Shop + smoke test: หน้าแรก, /products, รายละเอียด, login, checkout, /orders
+- [ ] ยืนยัน CORS อนุญาต origin ของ Shop
 
-### Phase 4B — VelShop ต่อ API (งานหลัก)
-- [ ] Catalog: `GET /products`, `GET /products/:slug`, categories
-- [ ] แสดง SKU บนหน้า product detail (ถ้าต้องการ)
-- [ ] Auth ลูกค้า
-- [ ] Cart → Checkout → Orders/me
-- [ ] เลิกพึ่ง `mock-data`
+### ไฟล์ที่แก้/เพิ่มในรอบนี้ (local)
+- `apps/shop/lib/orders.ts` **(ใหม่)** — `fetchMyOrders`, `checkoutFromClientCart`, status labels
+- `apps/shop/app/orders/orders-view.tsx` — เลิก mock → API
+- `apps/shop/app/checkout/checkout-view.tsx` — require auth, sync cart, POST checkout, แก้ emoji→imageUrl
+
+### Phase 4B ต่อ (optional)
+- [ ] (optional) sync cart กับ backend ตลอด session ไม่ใช่แค่ตอน checkout
+- [ ] ส่งที่อยู่จัดส่ง / payment method ไป backend (ตอนนี้ UI เก็บ local อย่างเดียว — order ยังไม่เก็บ address)
+- [ ] แสดงรายละเอียด order (items) บนหน้า orders
 
 ### Phase 5 — Support Chat + SLA
-- [ ] Schema: Conversation, Message (+ type/status/slaDeadlineAt)
-- [ ] API CRUD แชทตาม role
-- [ ] UI inbox ใน Shop / Merchant / Center
-- [ ] SLA 72 ชม. + เรียงเลยกำหนด / ใกล้หมดเวลา
-- [ ] แถบ “ใกล้หมดเวลา” (≤24h / ≤6h / เลยกำหนด)
-- [ ] WebSocket `chat:message`, `chat:conversation_updated`
-- [ ] ผูก productId / orderId / แสดง SKU ในเคส
+- [ ] Schema Conversation / Message
+- [ ] API + UI + WebSocket + SLA 72h
 
 ---
 
 ## ออกแบบย่อ — SKU (implemented)
 
-- `sku`: unique, auto `VLX-P-` + base36 + 2 random chars — ห้ามแก้จาก client  
-- `sellerSku`: optional จากร้าน (Merchant form)  
-- ค้นหา backend: name OR sku OR sellerSku  
-- แสดง: Merchant list/form, Center products  
-- ใช้ในซัพพอร์ต/ออเดอร์แทน UUID (Phase 5)  
+- `sku`: unique, auto `VLX-P-` + base36 + rand  
+- `sellerSku`: optional จากร้าน  
+- แสดง: Merchant, Center, Shop detail/list  
 
-## ออกแบบย่อ — Chat
+## ออกแบบย่อ — Shop icons
 
-- ประเภท: CUSTOMER_SHOP | CUSTOMER_SUPPORT | SHOP_SUPPORT  
-- SLA: ฝั่งที่ต้องตอบมีเวลา 3 วัน หลังข้อความล่าสุดของอีกฝั่ง  
-- Sort: เลย SLA → เหลือเวลาน้อย → ล่าสุด  
-- Realtime ผ่าน EventsGateway เดิม  
+- ใช้ inline SVG ใน `apps/shop/components/icons.tsx`  
+- ไม่ใช้อีโมจิใน UI หลัก (สไตล์เดียวกับ VelCenter)
+
+## ออกแบบย่อ — Checkout flow (ใหม่)
+
+1. ลูกค้าต้อง login (redirect `/login?redirect=/checkout` ถ้ายังไม่ login)
+2. กดยืนยัน → `DELETE /cart` แล้ว `POST /cart/items` ทีละรายการจาก local cart
+3. `POST /orders/checkout` → backend สร้าง order จาก server cart + ลด stock + เคลียร์ cart
+4. เคลียร์ local cart + แสดง orderNumber
 
 ---
 
 ## Deploy notes
 
 - Backend Render: `pnpm install && pnpm build` / `pnpm start:prod`  
-- DB ต้องมีคอลัมน์ `products.sku` (NOT NULL UNIQUE) และ `products.seller_sku`  
-- monorepo: ต้อง sync `pnpm-lock.yaml` กับทุก `package.json`  
-- `CORS_ORIGINS` รวม Center + Shop + Merchant  
-- Center ต้องมี `socket.io-client`  
-- Shop: ตั้ง `NEXT_PUBLIC_API_URL` ชี้ backend  
+- Shop Vercel: **ต้องมี** `NEXT_PUBLIC_API_URL`  
+- `CORS_ORIGINS` รวม Shop domain  
+- หลัง migration ต้องมีคอลัมน์ `sku` / `seller_sku` บน products  
 
 ---
 
-## ลำดับที่แนะนำให้ทีมทำจริง
+## ลำดับที่แนะนำ
 
-1. Redeploy backend + Center + Merchant → smoke test SKU  
-2. **Phase 4B** VelShop catalog → auth → cart/checkout → เลิก mock  
-3. (optional) โชว์ SKU บน Shop product detail  
-4. Phase 5 Chat foundation → SLA UI → realtime
+1. Push ไฟล์ orders/checkout → commit  
+2. Deploy Shop + ตั้ง env + ทดสอบ catalog + auth + checkout  
+3. (optional) address/payment บน order  
+4. Chat + SLA
