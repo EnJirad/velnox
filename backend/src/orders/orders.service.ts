@@ -18,6 +18,21 @@ function generateOrderNumber(): string {
   return `VLX-${timestamp}-${random}`;
 }
 
+
+/** ฟิลด์ order สำหรับ list — ไม่พึ่ง shipping ถ้า DB ยังไม่ sync; detail ใช้ full */
+/** list ไม่ดึง shipping_* เพื่อกัน 500 ถ้า DB ยังไม่ sync คอลัมน์ (detail ค่อยดึงเต็ม) */
+const ORDER_LIST_SELECT = {
+  id: true,
+  userId: true,
+  orderNumber: true,
+  status: true,
+  subtotal: true,
+  shippingFee: true,
+  total: true,
+  paymentStatus: true,
+  createdAt: true,
+} as const;
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -200,20 +215,44 @@ export class OrdersService {
     }
     return this.prisma.orderItem.findMany({
       where: { merchantId: merchant.id },
-      include: { order: true, product: true },
+      select: {
+        id: true,
+        orderId: true,
+        productId: true,
+        merchantId: true,
+        quantity: true,
+        price: true,
+        product: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+          },
+        },
+        order: { select: { ...ORDER_LIST_SELECT } },
+      },
       orderBy: { order: { createdAt: 'desc' } },
     });
   }
 
   findAll() {
     return this.prisma.order.findMany({
-      include: {
+      select: {
+        ...ORDER_LIST_SELECT,
         items: {
-          include: {
+          select: {
+            id: true,
+            orderId: true,
+            productId: true,
+            merchantId: true,
+            quantity: true,
+            price: true,
             product: { select: { id: true, name: true } },
           },
         },
         user: { select: { id: true, name: true, email: true } },
+        payment: true,
       },
       orderBy: { createdAt: 'desc' },
     });

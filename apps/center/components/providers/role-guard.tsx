@@ -15,7 +15,7 @@ interface RoleGuardProps {
 
 /**
  * Client-side role gate for VelCenter admin screens.
- * Waits for auth bootstrap before deciding access.
+ * ถ้าไม่มี session / role ไม่ตรง → ไป login (ไม่ค้างข้อความ You do not have access)
  */
 export function RoleGuard({ allow, children, fallback = null }: RoleGuardProps) {
   const router = useRouter();
@@ -25,10 +25,10 @@ export function RoleGuard({ allow, children, fallback = null }: RoleGuardProps) 
 
   useEffect(() => {
     if (isInitializing) return;
-    if (!user) {
-      router.push('/login');
+    if (!user || !hasRole(allow)) {
+      router.replace('/login');
     }
-  }, [isInitializing, user, router]);
+  }, [isInitializing, user, router, hasRole, allow]);
 
   if (isInitializing || !user) {
     return <LoadingScreen />;
@@ -38,7 +38,12 @@ export function RoleGuard({ allow, children, fallback = null }: RoleGuardProps) 
     return (
       <>
         {fallback ?? (
-          <p className="p-6 text-sm text-red-600">You do not have access to this section.</p>
+          <div className="p-6 text-sm text-slate-600">
+            กำลังตรวจสอบสิทธิ์... ถ้าไม่เข้าสู่ระบบอัตโนมัติ กรุณา{' '}
+            <a href="/login" className="font-medium text-teal-700 underline">
+              เข้าสู่ระบบใหม่
+            </a>
+          </div>
         )}
       </>
     );

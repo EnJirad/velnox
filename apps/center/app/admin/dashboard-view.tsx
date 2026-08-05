@@ -35,14 +35,15 @@ export default function DashboardView() {
   useEffect(() => {
     async function fetchDashboardData() {
       try {
-        const [statsData, revenueData, ordersData] = await Promise.all([
+        const [statsRes, revenueRes, ordersRes] = await Promise.allSettled([
           apiClient.get<Stats>('/analytics/platform-stats'),
           apiClient.get<RevenuePoint[]>('/analytics/revenue-chart'),
           apiClient.get<Order[]>('/analytics/recent-orders'),
         ]);
-        setStats(statsData);
-        setRevenue(revenueData);
-        setOrders(ordersData);
+        if (statsRes.status === 'fulfilled') setStats(statsRes.value);
+        else setError('ไม่สามารถโหลดข้อมูล Dashboard ได้');
+        if (revenueRes.status === 'fulfilled') setRevenue(revenueRes.value);
+        if (ordersRes.status === 'fulfilled') setOrders(ordersRes.value);
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err);
         setError('ไม่สามารถโหลดข้อมูล Dashboard ได้');

@@ -18,7 +18,7 @@ export class AuthController {
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.register(dto);
     this.setRefreshTokenCookie(res, result.refreshToken);
-    return { ...result, refreshToken: undefined }; // Don't send refreshToken in body
+    return { ...result, refreshToken: undefined };
   }
 
   @Public()
@@ -27,7 +27,7 @@ export class AuthController {
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
     this.setRefreshTokenCookie(res, result.refreshToken);
-    return { ...result, refreshToken: undefined }; // Don't send refreshToken in body
+    return { ...result, refreshToken: undefined };
   }
 
   @Public()
@@ -46,31 +46,44 @@ export class AuthController {
 
   @HttpCode(HttpStatus.OK)
   @Post('logout')
-  async logout(@CurrentUser() user: AuthenticatedRequestUser, @Res({ passthrough: true }) res: Response) {
+  async logout(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const result = await this.authService.logout(user.userId);
     this.clearRefreshTokenCookie(res);
     return result;
   }
 
-  private setRefreshTokenCookie(res: Response, refreshToken: string) {
-    const isProduction = process.env.NODE_ENV === 'production';
+  /**
+   * Cross-site cookie (Vercel frontend → Render API) ต้อง SameSite=None; Secure
+   * อย่าพึ่งแค่ NODE_ENV — Render บางทีไม่ set production
+   */
+  private useCrossSiteCookie(): boolean {
+    if (process.env.COOKIE_SAMESITE === 'none') return true;
+    if (process.env.NODE_ENV === 'production') return true;
+    const cors = process.env.CORS_ORIGINS ?? '';
+    if (cors.includes('https://')) return true;
+    return false;
+  }
 
+  private setRefreshTokenCookie(res: Response, refreshToken: string) {
+    const crossSite = this.useCrossSiteCookie();
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      secure: crossSite,
+      sameSite: crossSite ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/',
     });
   }
 
   private clearRefreshTokenCookie(res: Response) {
-    const isProduction = process.env.NODE_ENV === 'production';
-
+    const crossSite = this.useCrossSiteCookie();
     res.clearCookie('refreshToken', {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
+      secure: crossSite,
+      sameSite: crossSite ? 'none' : 'lax',
       path: '/',
     });
   }

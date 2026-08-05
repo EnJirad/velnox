@@ -153,10 +153,16 @@ export class AnalyticsService {
     return this.prisma.order.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
-      include: {
-        user: {
-          select: { name: true, email: true },
-        },
+      select: {
+        id: true,
+        orderNumber: true,
+        status: true,
+        subtotal: true,
+        shippingFee: true,
+        total: true,
+        paymentStatus: true,
+        createdAt: true,
+        user: { select: { name: true, email: true } },
       },
     });
   }
@@ -315,9 +321,29 @@ export class AnalyticsService {
 
     const items = await this.prisma.orderItem.findMany({
       where: { merchantId: merchant.id },
-      include: {
-        order: true,
-        product: { include: { images: true } },
+      select: {
+        id: true,
+        orderId: true,
+        productId: true,
+        quantity: true,
+        price: true,
+        order: {
+          select: {
+            id: true,
+            orderNumber: true,
+            status: true,
+            createdAt: true,
+            total: true,
+            paymentStatus: true,
+          },
+        },
+        product: {
+          select: {
+            id: true,
+            name: true,
+            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+          },
+        },
       },
       orderBy: { order: { createdAt: 'desc' } },
     });
@@ -502,7 +528,15 @@ export class AnalyticsService {
         where: { paymentStatus: 'PAID' },
         take: 10,
         orderBy: { createdAt: 'desc' },
-        include: { user: { select: { name: true, email: true } } },
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          total: true,
+          paymentStatus: true,
+          createdAt: true,
+          user: { select: { name: true, email: true } },
+        },
       }),
       this.prisma.orderItem.groupBy({
         by: ['productId'],
