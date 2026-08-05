@@ -60,9 +60,32 @@ export function encodePathSegment(raw: string): string {
   return encodeURIComponent(value);
 }
 
+// --- short client cache (ลด refetch ตอน navigate กลับมาใน session เดียวกัน) ---
+const CACHE_TTL_MS = 60_000; // 1 นาที
+const mem = new Map<string, { at: number; data: unknown }>();
+
+function cacheGet<T>(key: string): T | null {
+  const hit = mem.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > CACHE_TTL_MS) {
+    mem.delete(key);
+    return null;
+  }
+  return hit.data as T;
+}
+
+function cacheSet(key: string, data: unknown) {
+  mem.set(key, { at: Date.now(), data });
+}
+
 export async function fetchCategories(): Promise<Category[]> {
+  const key = 'categories';
+  const cached = cacheGet<Category[]>(key);
+  if (cached) return cached;
   try {
-    return await apiClient.get<Category[]>('/categories', { skipAuth: true });
+    const data = await apiClient.get<Category[]>('/categories', { skipAuth: true });
+    cacheSet(key, data);
+    return data;
   } catch {
     return [];
   }
@@ -82,19 +105,29 @@ export async function fetchProducts(params?: {
   if (params?.limit) qs.set('limit', String(params.limit ?? 20));
   if (params?.sort) qs.set('sort', params.sort);
   const path = '/products' + (qs.toString() ? '?' + qs.toString() : '');
+  const key = `products:${path}`;
+  const cached = cacheGet<PaginatedProducts>(key);
+  if (cached) return cached;
   try {
-    return await apiClient.get<PaginatedProducts>(path, { skipAuth: true });
+    const data = await apiClient.get<PaginatedProducts>(path, { skipAuth: true });
+    cacheSet(key, data);
+    return data;
   } catch {
     return { items: [], total: 0, page: 1, limit: 20, totalPages: 0 };
   }
 }
 
 export async function fetchProductBySlug(slug: string): Promise<CatalogProduct | null> {
+  const key = `product:${slug}`;
+  const cached = cacheGet<CatalogProduct>(key);
+  if (cached) return cached;
   try {
     const p = await apiClient.get<Product>(`/products/${encodePathSegment(slug)}`, {
       skipAuth: true,
     });
-    return toCatalogProduct(p);
+    const catalog = toCatalogProduct(p);
+    cacheSet(key, catalog);
+    return catalog;
   } catch {
     return null;
   }

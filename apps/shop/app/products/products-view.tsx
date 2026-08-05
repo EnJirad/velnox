@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { formatCurrency } from '@velnox/utils';
 import type { Category } from '@velnox/types';
 import { AddToCartButton } from '@/components/add-to-cart-button';
-import { IconImage } from '@/components/icons';
+import { ProductImage } from '@/components/product-image';
 import {
   fetchCategories,
   fetchProducts,
@@ -143,12 +143,7 @@ export function ProductsView({ initialCategory }: { initialCategory?: string }) 
                     href={`/products/${p.slug}`}
                     className="flex h-32 items-center justify-center bg-slate-50 text-slate-300"
                   >
-                    {p.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
-                    ) : (
-                      <IconImage size={36} />
-                    )}
+                    <ProductImage src={p.imageUrl} alt={p.name} width={400} />
                   </Link>
                   <div className="flex flex-1 flex-col gap-1 p-3">
                     <Link

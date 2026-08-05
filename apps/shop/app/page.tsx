@@ -9,12 +9,12 @@ import { useLanguage } from '@/components/providers/language-provider';
 import {
   IconBox,
   IconChat,
-  IconImage,
   IconReturn,
   IconShield,
   IconTag,
   IconTruck,
 } from '@/components/icons';
+import { ProductImage } from '@/components/product-image';
 import {
   fetchCategories,
   fetchProducts,
@@ -80,8 +80,7 @@ export default function HomePage() {
                     className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl bg-white/10 backdrop-blur"
                   >
                     {p?.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
+                      <ProductImage src={p.imageUrl} alt="" width={200} priority={i < 2} />
                     ) : (
                       <IconBox className="text-white/70" size={36} />
                     )}
@@ -141,12 +140,7 @@ export default function HomePage() {
                   href={`/products/${p.slug}`}
                   className="flex h-36 items-center justify-center bg-slate-50 text-slate-300"
                 >
-                  {p.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
-                  ) : (
-                    <IconImage size={40} />
-                  )}
+                  <ProductImage src={p.imageUrl} alt={p.name} width={400} />
                 </Link>
                 <div className="flex flex-1 flex-col gap-1 p-3">
                   <Link

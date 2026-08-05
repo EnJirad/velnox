@@ -65,12 +65,21 @@ export class ProductsService {
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          images: true,
-          category: true,
-          shop: true,
+          // list view: แค่รูปแรก + ข้อมูลเบา เพื่อโหลดเร็ว
+          images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+          category: { select: { id: true, name: true, slug: true } },
+          shop: { select: { id: true, name: true } },
           velRepeatPlans: {
             where: { isActive: true },
             orderBy: { sortOrder: 'asc' },
+            select: {
+              planCode: true,
+              frequency: true,
+              totalUnits: true,
+              unitsPerDelivery: true,
+              discountPercent: true,
+              freeShipping: true,
+            },
           },
         },
       }),
