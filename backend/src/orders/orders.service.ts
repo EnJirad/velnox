@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { ShippingAddressDto } from './dto/checkout.dto';
 import { EventsGateway } from '../events/events.gateway';
 
 const SHIPPING_FEE = 40;
@@ -24,7 +25,22 @@ export class OrdersService {
     private readonly events: EventsGateway,
   ) {}
 
-  async createFromCart(userId: string, paymentMethod: string = 'promptpay') {
+  async createFromCart(
+    userId: string,
+    paymentMethod: string = 'promptpay',
+    shipping?: ShippingAddressDto,
+  ) {
+    if (
+      !shipping ||
+      !shipping.name?.trim() ||
+      !shipping.phone?.trim() ||
+      !shipping.addressLine?.trim() ||
+      !shipping.province?.trim() ||
+      !shipping.postalCode?.trim()
+    ) {
+      throw new BadRequestException('Shipping address is required');
+    }
+
     const cart = await this.prisma.cart.findUnique({
       where: { userId },
       include: { items: { include: { product: true } } },
@@ -57,6 +73,12 @@ export class OrdersService {
           shippingFee,
           total,
           paymentStatus: 'PENDING',
+          shippingName: shipping.name.trim(),
+          shippingPhone: shipping.phone.trim(),
+          shippingAddressLine: shipping.addressLine.trim(),
+          shippingProvince: shipping.province.trim(),
+          shippingPostalCode: shipping.postalCode.trim(),
+          shippingCountry: (shipping.country ?? 'TH').trim() || 'TH',
           items: {
             create: await Promise.all(
               cart.items.map(async (item) => {

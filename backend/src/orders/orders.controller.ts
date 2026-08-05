@@ -12,7 +12,11 @@ export class OrdersController {
 
   @Post('checkout')
   checkout(@CurrentUser() user: AuthenticatedRequestUser, @Body() dto: CheckoutDto) {
-    return this.ordersService.createFromCart(user.userId, dto.paymentMethod);
+    return this.ordersService.createFromCart(
+      user.userId,
+      dto.paymentMethod,
+      dto.shippingAddress,
+    );
   }
 
   @Get('me')

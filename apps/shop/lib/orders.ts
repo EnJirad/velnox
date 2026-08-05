@@ -29,6 +29,15 @@ export const paymentMethodLabel: Record<string, string> = {
   cod: 'เก็บเงินปลายทาง',
 };
 
+export type ShippingAddressInput = {
+  name: string;
+  phone: string;
+  addressLine: string;
+  province: string;
+  postalCode: string;
+  country?: string;
+};
+
 export async function fetchMyOrders(): Promise<Order[]> {
   return apiClient.get<Order[]>('/orders/me');
 }
@@ -40,9 +49,19 @@ export async function fetchMyOrders(): Promise<Order[]> {
 export async function checkoutFromClientCart(
   items: CartItem[],
   paymentMethod: 'promptpay' | 'card' | 'cod' = 'promptpay',
+  shippingAddress: ShippingAddressInput,
 ): Promise<Order> {
   if (items.length === 0) {
     throw new Error('ตะกร้าว่าง');
+  }
+  if (
+    !shippingAddress?.name?.trim() ||
+    !shippingAddress?.phone?.trim() ||
+    !shippingAddress?.addressLine?.trim() ||
+    !shippingAddress?.province?.trim() ||
+    !shippingAddress?.postalCode?.trim()
+  ) {
+    throw new Error('กรุณากรอกที่อยู่จัดส่งให้ครบ');
   }
 
   await apiClient.delete('/cart');
@@ -53,5 +72,15 @@ export async function checkoutFromClientCart(
     });
   }
 
-  return apiClient.post<Order>('/orders/checkout', { paymentMethod });
+  return apiClient.post<Order>('/orders/checkout', {
+    paymentMethod,
+    shippingAddress: {
+      name: shippingAddress.name.trim(),
+      phone: shippingAddress.phone.trim(),
+      addressLine: shippingAddress.addressLine.trim(),
+      province: shippingAddress.province.trim(),
+      postalCode: shippingAddress.postalCode.trim(),
+      country: shippingAddress.country ?? 'TH',
+    },
+  });
 }

@@ -305,6 +305,14 @@ model Order {
   paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
   createdAt     DateTime      @default(now()) @map("created_at")
 
+  // ที่อยู่จัดส่ง (snapshot ตอน checkout)
+  shippingName        String? @map("shipping_name")
+  shippingPhone       String? @map("shipping_phone")
+  shippingAddressLine String? @map("shipping_address_line")
+  shippingProvince    String? @map("shipping_province")
+  shippingPostalCode  String? @map("shipping_postal_code")
+  shippingCountry     String  @default("TH") @map("shipping_country")
+
   user              User               @relation(fields: [userId], references: [id])
   items             OrderItem[]
   payment           Payment?

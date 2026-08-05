@@ -43,6 +43,13 @@ export interface Order {
   shippingFee: number;
   total: number;
   paymentStatus: PaymentStatus;
+  /** ที่อยู่จัดส่ง (snapshot ตอน checkout) */
+  shippingName?: string | null;
+  shippingPhone?: string | null;
+  shippingAddressLine?: string | null;
+  shippingProvince?: string | null;
+  shippingPostalCode?: string | null;
+  shippingCountry?: string | null;
   items?: OrderItem[];
   payment?: OrderPayment | null;
   createdAt: string;

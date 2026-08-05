@@ -21,7 +21,7 @@ export function CheckoutView() {
   const clear = useCartStore((s) => s.clear);
   const [step, setStep] = useState(0);
   const [payment, setPayment] = useState<'card' | 'promptpay' | 'cod'>('promptpay');
-  const [address, setAddress] = useState({ name: '', phone: '', line: '', city: '', postal: '' });
+  const [address, setAddress] = useState({ name: '', phone: '', line: '', province: '', postal: '' });
   const [placed, setPlaced] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +85,14 @@ export function CheckoutView() {
     setError(null);
     setSubmitting(true);
     try {
-      const order = await checkoutFromClientCart(items, payment);
+      const order = await checkoutFromClientCart(items, payment, {
+        name: address.name,
+        phone: address.phone,
+        addressLine: address.line,
+        province: address.province,
+        postalCode: address.postal,
+        country: 'TH',
+      });
       clear();
       setPlaced(order.orderNumber);
     } catch (err) {
@@ -161,8 +168,8 @@ export function CheckoutView() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <input
                   placeholder="จังหวัด"
-                  value={address.city}
-                  onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                  value={address.province}
+                  onChange={(e) => setAddress({ ...address, province: e.target.value })}
                   className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
                 />
                 <input
@@ -174,7 +181,20 @@ export function CheckoutView() {
               </div>
               <button
                 type="button"
-                onClick={() => setStep(1)}
+                onClick={() => {
+                  if (
+                    !address.name.trim() ||
+                    !address.phone.trim() ||
+                    !address.line.trim() ||
+                    !address.province.trim() ||
+                    !address.postal.trim()
+                  ) {
+                    setError('กรุณากรอกที่อยู่จัดส่งให้ครบถ้วน');
+                    return;
+                  }
+                  setError(null);
+                  setStep(1);
+                }}
                 className="mt-2 w-fit rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
               >
                 ถัดไป
@@ -232,7 +252,7 @@ export function CheckoutView() {
               <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
                 <p className="font-medium text-slate-800">{address.name || 'ผู้รับสินค้า'}</p>
                 <p>{address.phone}</p>
-                <p>{[address.line, address.city, address.postal].filter(Boolean).join(' ')}</p>
+                <p>{[address.line, address.province, address.postal].filter(Boolean).join(' ')}</p>
               </div>
               <ul className="flex flex-col gap-2 text-sm text-slate-600">
                 {items.map((i) => (
