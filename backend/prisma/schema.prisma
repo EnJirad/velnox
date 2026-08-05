@@ -1,9 +1,8 @@
-// Velnox Prisma Schema
-// Foundation models per docs/12_Database_Design.md
-// Note: this Foundation ships User/Role/Profile fully wired, plus relations
-// scaffolded for Merchant, Shop, Product, Category, Order and VelRepeat so
-// later feature work can extend these models without re-architecting.
-
+// Velnox Prisma Schema — source of truth for models
+// Aligned with production Neon as of 2026-08-06 (commit ~234b4f7)
+// Includes: Order shipping snapshot, VelRepeat prepaid pack + product plans
+// Reference SQL dump: backend/prisma/vel-table.sql
+//
 generator client {
   provider = "prisma-client-js"
 }

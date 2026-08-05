@@ -1,3 +1,13 @@
+-- =============================================================================
+-- Velnox — Reference SQL (aligned with backend/prisma/schema.prisma)
+-- Updated: 2026-08-06
+--
+-- ใช้สำหรับ: สร้าง DB ใหม่ / เทียบกับ Neon / เอกสาร
+-- Production ที่รันไปแล้ว: ใช้เฉพาะส่วน ADD COLUMN IF NOT EXISTS ท้ายไฟล์ได้
+--
+-- ห้าม: สร้างตารางชื่อ velrepeat_history_new (ต้องเป็น velrepeat_history)
+-- =============================================================================
+
 -- =========================
 -- Enums
 -- =========================
@@ -110,18 +120,19 @@ CREATE TABLE "categories" (
 );
 
 CREATE TABLE "products" (
-  "id"          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "shop_id"     UUID NOT NULL,
-  "category_id" UUID NOT NULL,
-  "name"        TEXT NOT NULL,
-  "slug"        TEXT NOT NULL UNIQUE,
-  "sku"         TEXT NOT NULL UNIQUE,
-  "seller_sku"  TEXT,
-  "description" TEXT,
-  "price"       DECIMAL(12, 2) NOT NULL,
-  "stock"       INTEGER NOT NULL DEFAULT 0,
-  "status"      "ProductStatus" NOT NULL DEFAULT 'DRAFT',
-  "created_at"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "id"                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "shop_id"            UUID NOT NULL,
+  "category_id"        UUID NOT NULL,
+  "name"               TEXT NOT NULL,
+  "slug"               TEXT NOT NULL UNIQUE,
+  "sku"                TEXT NOT NULL UNIQUE,
+  "seller_sku"         TEXT,
+  "description"        TEXT,
+  "price"              DECIMAL(12, 2) NOT NULL,
+  "stock"              INTEGER NOT NULL DEFAULT 0,
+  "status"             "ProductStatus" NOT NULL DEFAULT 'DRAFT',
+  "vel_repeat_enabled" BOOLEAN NOT NULL DEFAULT FALSE,
+  "created_at"         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT "products_shop_id_fkey"
     FOREIGN KEY ("shop_id") REFERENCES "shops"("id") ON DELETE CASCADE,
   CONSTRAINT "products_category_id_fkey"
@@ -179,19 +190,25 @@ CREATE TABLE "cart_items" (
 );
 
 -- =========================
--- Order Domain
+-- Order Domain (รวม shipping snapshot)
 -- =========================
 
 CREATE TABLE "orders" (
-  "id"             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id"        UUID NOT NULL,
-  "order_number"   TEXT NOT NULL UNIQUE,
-  "status"         "OrderStatus" NOT NULL DEFAULT 'PENDING',
-  "subtotal"       DECIMAL(12, 2) NOT NULL,
-  "shipping_fee"   DECIMAL(12, 2) NOT NULL DEFAULT 0,
-  "total"          DECIMAL(12, 2) NOT NULL,
-  "payment_status" "PaymentStatus" NOT NULL DEFAULT 'PENDING',
-  "created_at"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "id"                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "user_id"               UUID NOT NULL,
+  "order_number"          TEXT NOT NULL UNIQUE,
+  "status"                "OrderStatus" NOT NULL DEFAULT 'PENDING',
+  "subtotal"              DECIMAL(12, 2) NOT NULL,
+  "shipping_fee"          DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  "total"                 DECIMAL(12, 2) NOT NULL,
+  "payment_status"        "PaymentStatus" NOT NULL DEFAULT 'PENDING',
+  "created_at"            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "shipping_name"         TEXT,
+  "shipping_phone"        TEXT,
+  "shipping_address_line" TEXT,
+  "shipping_province"     TEXT,
+  "shipping_postal_code"  TEXT,
+  "shipping_country"      TEXT NOT NULL DEFAULT 'TH',
   CONSTRAINT "orders_user_id_fkey"
     FOREIGN KEY ("user_id") REFERENCES "users"("id")
 );
@@ -284,27 +301,26 @@ CREATE TABLE "velrepeat_history" (
     FOREIGN KEY ("pack_id") REFERENCES "velrepeat_packs"("id") ON DELETE CASCADE
 );
 
-ALTER TABLE "products"
-  ADD COLUMN IF NOT EXISTS "vel_repeat_enabled" BOOLEAN NOT NULL DEFAULT FALSE;
-
-CREATE TABLE IF NOT EXISTS "product_velrepeat_plans" (
-  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "product_id" UUID NOT NULL REFERENCES "products"("id") ON DELETE CASCADE,
-  "plan_code" TEXT NOT NULL,
-  "frequency" "VelRepeatFrequency" NOT NULL,
-  "total_units" INTEGER NOT NULL,
+CREATE TABLE "product_velrepeat_plans" (
+  "id"                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "product_id"         UUID NOT NULL,
+  "plan_code"          TEXT NOT NULL,
+  "frequency"          "VelRepeatFrequency" NOT NULL,
+  "total_units"        INTEGER NOT NULL,
   "units_per_delivery" INTEGER NOT NULL DEFAULT 1,
-  "discount_percent" INTEGER NOT NULL DEFAULT 0,
-  "free_shipping" BOOLEAN NOT NULL DEFAULT TRUE,
-  "is_active" BOOLEAN NOT NULL DEFAULT TRUE,
-  "sort_order" INTEGER NOT NULL DEFAULT 0,
-  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  "discount_percent"   INTEGER NOT NULL DEFAULT 0,
+  "free_shipping"      BOOLEAN NOT NULL DEFAULT TRUE,
+  "is_active"          BOOLEAN NOT NULL DEFAULT TRUE,
+  "sort_order"         INTEGER NOT NULL DEFAULT 0,
+  "created_at"         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at"         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT "product_velrepeat_plans_product_id_fkey"
+    FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS "product_velrepeat_plans_product_id_is_active_idx"
+CREATE INDEX "product_velrepeat_plans_product_id_is_active_idx"
   ON "product_velrepeat_plans" ("product_id", "is_active");
-  
+
 -- =========================
 -- Notification Domain
 -- =========================
@@ -347,20 +363,88 @@ CREATE TABLE "merchant_reports" (
 -- Platform Settings (VelCenter)
 -- =========================
 
-CREATE TABLE IF NOT EXISTS "platform_settings" (
-  "id"                      TEXT PRIMARY KEY DEFAULT 'default',
-  "platform_name"           TEXT NOT NULL DEFAULT 'Velnox Commerce Platform',
-  "commission_percent"      DECIMAL(5, 2) NOT NULL DEFAULT 5,
-  "auto_approve_merchants"  BOOLEAN NOT NULL DEFAULT false,
-  "require_product_review"  BOOLEAN NOT NULL DEFAULT true,
-  "payment_credit_card"     BOOLEAN NOT NULL DEFAULT true,
-  "payment_prompt_pay"      BOOLEAN NOT NULL DEFAULT true,
-  "payment_bank_transfer"   BOOLEAN NOT NULL DEFAULT true,
-  "payment_cod"             BOOLEAN NOT NULL DEFAULT true,
-  "created_at"              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "updated_at"              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "auto_approve_products" BOOLEAN NOT NULL DEFAULT false;
+CREATE TABLE "platform_settings" (
+  "id"                     TEXT PRIMARY KEY DEFAULT 'default',
+  "platform_name"          TEXT NOT NULL DEFAULT 'Velnox Commerce Platform',
+  "commission_percent"     DECIMAL(5, 2) NOT NULL DEFAULT 5,
+  "auto_approve_merchants" BOOLEAN NOT NULL DEFAULT false,
+  "require_product_review" BOOLEAN NOT NULL DEFAULT true,
+  "payment_credit_card"    BOOLEAN NOT NULL DEFAULT true,
+  "payment_prompt_pay"     BOOLEAN NOT NULL DEFAULT true,
+  "payment_bank_transfer"  BOOLEAN NOT NULL DEFAULT true,
+  "payment_cod"            BOOLEAN NOT NULL DEFAULT true,
+  "created_at"             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at"             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "auto_approve_products"  BOOLEAN NOT NULL DEFAULT false
 );
 
 INSERT INTO "platform_settings" ("id") VALUES ('default')
 ON CONFLICT ("id") DO NOTHING;
+
+-- =============================================================================
+-- Incremental patches สำหรับ DB ที่สร้างไว้แล้ว (idempotent)
+-- รันบน Neon ได้โดยไม่พังถ้ามีคอลัมน์/ตารางอยู่แล้ว
+-- =============================================================================
+
+ALTER TABLE "products"
+  ADD COLUMN IF NOT EXISTS "vel_repeat_enabled" BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE "orders"
+  ADD COLUMN IF NOT EXISTS "shipping_name" TEXT,
+  ADD COLUMN IF NOT EXISTS "shipping_phone" TEXT,
+  ADD COLUMN IF NOT EXISTS "shipping_address_line" TEXT,
+  ADD COLUMN IF NOT EXISTS "shipping_province" TEXT,
+  ADD COLUMN IF NOT EXISTS "shipping_postal_code" TEXT,
+  ADD COLUMN IF NOT EXISTS "shipping_country" TEXT NOT NULL DEFAULT 'TH';
+
+CREATE TABLE IF NOT EXISTS "velrepeat_packs" (
+  "id"                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "user_id"            UUID NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+  "product_id"         UUID NOT NULL REFERENCES "products"("id"),
+  "plan_code"          TEXT NOT NULL,
+  "frequency"          "VelRepeatFrequency" NOT NULL,
+  "total_units"        INTEGER NOT NULL,
+  "remaining_units"    INTEGER NOT NULL,
+  "units_per_delivery" INTEGER NOT NULL DEFAULT 1,
+  "unit_price"         DECIMAL(12, 2) NOT NULL,
+  "pack_price"         DECIMAL(12, 2) NOT NULL,
+  "free_shipping"      BOOLEAN NOT NULL DEFAULT TRUE,
+  "status"             "VelRepeatPackStatus" NOT NULL DEFAULT 'ACTIVE',
+  "next_delivery_date" TIMESTAMPTZ NOT NULL,
+  "prepaid_payment_id" TEXT,
+  "created_at"         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at"         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS "velrepeat_deliveries" (
+  "id"           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "pack_id"      UUID NOT NULL REFERENCES "velrepeat_packs"("id") ON DELETE CASCADE,
+  "order_id"     UUID UNIQUE REFERENCES "orders"("id"),
+  "units"        INTEGER NOT NULL DEFAULT 1,
+  "scheduled_at" TIMESTAMPTZ NOT NULL,
+  "delivered_at" TIMESTAMPTZ,
+  "created_at"   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS "velrepeat_history" (
+  "id"         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "pack_id"    UUID NOT NULL REFERENCES "velrepeat_packs"("id") ON DELETE CASCADE,
+  "action"     TEXT NOT NULL,
+  "note"       TEXT,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS "product_velrepeat_plans" (
+  "id"                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "product_id"         UUID NOT NULL REFERENCES "products"("id") ON DELETE CASCADE,
+  "plan_code"          TEXT NOT NULL,
+  "frequency"          "VelRepeatFrequency" NOT NULL,
+  "total_units"        INTEGER NOT NULL,
+  "units_per_delivery" INTEGER NOT NULL DEFAULT 1,
+  "discount_percent"   INTEGER NOT NULL DEFAULT 0,
+  "free_shipping"      BOOLEAN NOT NULL DEFAULT TRUE,
+  "is_active"          BOOLEAN NOT NULL DEFAULT TRUE,
+  "sort_order"         INTEGER NOT NULL DEFAULT 0,
+  "created_at"         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at"         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
