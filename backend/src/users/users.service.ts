@@ -150,7 +150,6 @@ export class UsersService {
 
     return this.findById(userId);
   }
-}
 
   // ---------- Addresses (customer) ----------
 
@@ -205,4 +204,4 @@ export class UsersService {
     await this.prisma.address.delete({ where: { id: addressId } });
     return { success: true };
   }
-
+}
