@@ -10,6 +10,7 @@ import { useAuthContext } from '@/components/providers/auth-provider';
 import { checkoutFromClientCart } from '@/lib/orders';
 import { ApiError } from '@/lib/api-client';
 import { IconBox } from '@/components/icons';
+import { PromptPayQrPanel } from '@/components/promptpay-qr-panel';
 
 const STEPS = ['ที่อยู่จัดส่ง', 'วิธีการชำระเงิน', 'ยืนยันคำสั่งซื้อ'];
 
@@ -22,7 +23,11 @@ export function CheckoutView() {
   const [step, setStep] = useState(0);
   const [payment, setPayment] = useState<'card' | 'promptpay' | 'cod'>('promptpay');
   const [address, setAddress] = useState({ name: '', phone: '', line: '', province: '', postal: '' });
-  const [placed, setPlaced] = useState<string | null>(null);
+  const [placed, setPlaced] = useState<{
+    id: string;
+    orderNumber: string;
+    payment: 'card' | 'promptpay' | 'cod';
+  } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,6 +66,33 @@ export function CheckoutView() {
   }
 
   if (placed) {
+    if (placed.payment === 'promptpay') {
+      return (
+        <div className="mx-auto max-w-lg px-4 py-10">
+          <div className="mb-6 text-center">
+            <h1 className="text-xl font-semibold text-slate-900">สั่งซื้อสำเร็จ — ชำระเงินด้วยพร้อมเพย์</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              เลขที่คำสั่งซื้อ{' '}
+              <span className="font-semibold text-teal-700">#{placed.orderNumber}</span>
+            </p>
+          </div>
+          <PromptPayQrPanel orderId={placed.id} orderNumber={placed.orderNumber} />
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.push('/orders')}
+              className="rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
+            >
+              ไปที่คำสั่งซื้อของฉัน
+            </button>
+            <p className="text-xs text-slate-400">
+              ปิดหน้านี้ได้ — กลับมาเปิด QR ได้จากหน้าคำสั่งซื้อ
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="mx-auto flex max-w-xl flex-col items-center gap-3 px-4 py-24 text-center">
         <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
@@ -68,8 +100,12 @@ export function CheckoutView() {
         </span>
         <h1 className="text-xl font-semibold text-slate-900">สั่งซื้อสำเร็จแล้ว!</h1>
         <p className="text-sm text-slate-500">
-          เลขที่คำสั่งซื้อของคุณคือ <span className="font-semibold text-teal-700">{placed}</span>
+          เลขที่คำสั่งซื้อของคุณคือ{' '}
+          <span className="font-semibold text-teal-700">#{placed.orderNumber}</span>
         </p>
+        {placed.payment === 'cod' && (
+          <p className="text-sm text-slate-600">ชำระเงินปลายทางเมื่อได้รับสินค้า</p>
+        )}
         <button
           type="button"
           onClick={() => router.push('/orders')}
@@ -94,7 +130,11 @@ export function CheckoutView() {
         country: 'TH',
       });
       clear();
-      setPlaced(order.orderNumber);
+      setPlaced({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        payment,
+      });
     } catch (err) {
       setError(
         err instanceof ApiError

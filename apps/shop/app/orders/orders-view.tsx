@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { formatCurrency, formatDate } from '@velnox/utils';
 import type { Order } from '@velnox/types';
 import { Badge } from '@velnox/ui';
@@ -12,10 +13,23 @@ import {
 } from '@/lib/orders';
 import { ApiError } from '@/lib/api-client';
 import { IconBox } from '@/components/icons';
+import { PromptPayQrPanel } from '@/components/promptpay-qr-panel';
+
+function needsPromptPayQr(order: Order): boolean {
+  if (order.paymentStatus === 'PAID' || order.paymentStatus === 'REFUNDED') return false;
+  if (order.status === 'CANCELLED') return false;
+  const method = (order.payment?.method ?? '').toUpperCase();
+  if (!method) return true;
+  if (method.includes('PROMPT') || method === 'PROMPTPAY' || method === 'PROMPTPAY_QR') return true;
+  if (method === 'COD' || method.includes('CARD')) return false;
+  return method.includes('TRANSFER') || method.includes('BANK');
+}
 
 export function OrdersView() {
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [qrOrder, setQrOrder] = useState<{ id: string; orderNumber: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,6 +48,16 @@ export function OrdersView() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!orders) return;
+    const payId = searchParams.get('pay');
+    if (!payId) return;
+    const found = orders.find((o) => o.id === payId);
+    if (found && needsPromptPayQr(found)) {
+      setQrOrder({ id: found.id, orderNumber: found.orderNumber });
+    }
+  }, [orders, searchParams]);
 
   if (orders === null) {
     return (
@@ -58,18 +82,17 @@ export function OrdersView() {
       ) : (
         <div className="flex flex-col gap-4">
           {orders.map((order) => (
-            <div key={order.id} className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div
+              key={order.id}
+              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    คำสั่งซื้อ #{order.orderNumber}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    สั่งซื้อเมื่อ {formatDate(order.createdAt)}
-                  </p>
+                  <p className="font-semibold text-slate-900">#{order.orderNumber}</p>
+                  <p className="text-xs text-slate-400">{formatDate(order.createdAt)}</p>
                 </div>
-                <Badge tone={orderStatusTone[order.status]}>
-                  {orderStatusLabel[order.status]}
+                <Badge tone={orderStatusTone[order.status] ?? 'neutral'}>
+                  {orderStatusLabel[order.status] ?? order.status}
                 </Badge>
               </div>
 
@@ -126,10 +149,31 @@ export function OrdersView() {
                         : 'รอชำระ'}
                   </span>
                 </div>
+
+                {needsPromptPayQr(order) && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setQrOrder({ id: order.id, orderNumber: order.orderNumber })
+                    }
+                    className="rounded-md bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800"
+                  >
+                    แสดง QR พร้อมเพย์
+                  </button>
+                )}
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {qrOrder && (
+        <PromptPayQrPanel
+          modal
+          orderId={qrOrder.id}
+          orderNumber={qrOrder.orderNumber}
+          onClose={() => setQrOrder(null)}
+        />
       )}
     </div>
   );
