@@ -15,14 +15,18 @@ export function AddToCartButton({
 }) {
   const addItem = useCartStore((s) => s.addItem);
   const [added, setAdded] = useState(false);
+  const outOfStock = !product.stock || product.stock <= 0;
 
-  function handleAdd() {
+  function handleAdd(e?: React.MouseEvent) {
+    e?.preventDefault();
+    e?.stopPropagation();
+    if (outOfStock) return;
     addItem(
       {
         productId: product.id,
         name: product.name,
-        price: product.price,
-        shopName: product.shopName,
+        price: Number(product.price) || 0,
+        shopName: product.shopName || '',
         stock: product.stock,
         imageUrl: product.imageUrl,
       },
@@ -34,14 +38,16 @@ export function AddToCartButton({
 
   return (
     <button
+      type="button"
       onClick={handleAdd}
+      disabled={outOfStock}
       className={
         compact
-          ? 'mt-1 w-full rounded-md border border-teal-700 py-1.5 text-xs font-medium text-teal-700 transition hover:bg-teal-700 hover:text-white'
-          : 'w-full rounded-md bg-teal-700 py-3 text-sm font-semibold text-white transition hover:bg-teal-800'
+          ? 'mt-1 w-full rounded-md border border-teal-700 py-1.5 text-xs font-medium text-teal-700 transition hover:bg-teal-700 hover:text-white disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400 disabled:hover:bg-transparent'
+          : 'w-full rounded-md bg-teal-700 py-3 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300'
       }
     >
-      {added ? 'เพิ่มลงตะกร้าแล้ว' : compact ? 'เพิ่มลงตะกร้า' : 'เพิ่มลงตะกร้า'}
+      {outOfStock ? 'สินค้าหมด' : added ? 'เพิ่มลงตะกร้าแล้ว' : 'เพิ่มลงตะกร้า'}
     </button>
   );
 }

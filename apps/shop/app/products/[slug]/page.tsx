@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { formatCurrency } from '@velnox/utils';
 import { AddToCartButton } from '@/components/add-to-cart-button';
+import { BuyNowButton } from '@/components/buy-now-button';
 import { VelRepeatWidget } from '@/components/velrepeat-widget';
 import { IconImage, IconReturn, IconShield, IconTruck } from '@/components/icons';
 import {
@@ -135,12 +136,7 @@ export default function ProductDetailPage() {
             <div className="flex-1">
               <AddToCartButton product={product} />
             </div>
-            <button
-              type="button"
-              className="flex-1 rounded-md bg-orange-500 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
-            >
-              ซื้อเลย
-            </button>
+            <BuyNowButton product={product} />
           </div>
 
           <VelRepeatWidget product={product} />
