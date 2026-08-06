@@ -1,8 +1,9 @@
-import { Body, Controller, Delete, Get, Param, Patch } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+import { CreateAddressDto } from './dto/create-address.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { AuthenticatedRequestUser } from '../auth/types/authenticated-request-user';
@@ -22,6 +23,27 @@ export class UsersController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.usersService.updateProfile(user.userId, dto);
+  }
+
+  @Get('addresses')
+  listAddresses(@CurrentUser() user: AuthenticatedRequestUser) {
+    return this.usersService.listAddresses(user.userId);
+  }
+
+  @Post('addresses')
+  createAddress(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Body() dto: CreateAddressDto,
+  ) {
+    return this.usersService.createAddress(user.userId, dto);
+  }
+
+  @Delete('addresses/:id')
+  deleteAddress(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Param('id') id: string,
+  ) {
+    return this.usersService.deleteAddress(user.userId, id);
   }
 
   @Roles('ADMIN', 'SUPER_ADMIN')

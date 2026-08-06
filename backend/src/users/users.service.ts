@@ -151,3 +151,58 @@ export class UsersService {
     return this.findById(userId);
   }
 }
+
+  // ---------- Addresses (customer) ----------
+
+  listAddresses(userId: string) {
+    return this.prisma.address.findMany({
+      where: { userId },
+      orderBy: [{ isDefault: 'desc' }, { id: 'asc' }],
+    });
+  }
+
+  async createAddress(
+    userId: string,
+    data: {
+      name: string;
+      phone: string;
+      addressLine: string;
+      city: string;
+      province: string;
+      postalCode: string;
+      country?: string;
+      isDefault?: boolean;
+    },
+  ) {
+    if (data.isDefault) {
+      await this.prisma.address.updateMany({
+        where: { userId },
+        data: { isDefault: false },
+      });
+    }
+    return this.prisma.address.create({
+      data: {
+        userId,
+        name: data.name.trim(),
+        phone: data.phone.trim(),
+        addressLine: data.addressLine.trim(),
+        city: data.city.trim(),
+        province: data.province.trim(),
+        postalCode: data.postalCode.trim(),
+        country: (data.country ?? 'TH').trim() || 'TH',
+        isDefault: !!data.isDefault,
+      },
+    });
+  }
+
+  async deleteAddress(userId: string, addressId: string) {
+    const existing = await this.prisma.address.findFirst({
+      where: { id: addressId, userId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Address not found');
+    }
+    await this.prisma.address.delete({ where: { id: addressId } });
+    return { success: true };
+  }
+

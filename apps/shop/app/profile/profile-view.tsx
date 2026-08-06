@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { logout as logoutRequest } from '@/lib/auth';
@@ -21,6 +21,29 @@ interface ProfileData {
   profile: { avatarUrl: string | null } | null;
 }
 
+interface AddressRow {
+  id: string;
+  name: string;
+  phone: string;
+  addressLine: string;
+  city: string;
+  province: string;
+  postalCode: string;
+  country: string;
+  isDefault: boolean;
+}
+
+const emptyForm = {
+  name: '',
+  phone: '',
+  addressLine: '',
+  city: '',
+  province: '',
+  postalCode: '',
+  country: 'TH',
+  isDefault: true,
+};
+
 export function ProfileView() {
   const router = useRouter();
   const clearUser = useAuthStore((s) => s.clearUser);
@@ -32,6 +55,21 @@ export function ProfileView() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  const [addresses, setAddresses] = useState<AddressRow[]>([]);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [addressForm, setAddressForm] = useState(emptyForm);
+  const [addressSaving, setAddressSaving] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
+
+  const loadAddresses = useCallback(async () => {
+    try {
+      const list = await apiClient.get<AddressRow[]>('/users/addresses');
+      setAddresses(Array.isArray(list) ? list : []);
+    } catch {
+      setAddresses([]);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,12 +92,21 @@ export function ProfileView() {
     };
   }, []);
 
+  useEffect(() => {
+    if (tab === 'address') {
+      void loadAddresses();
+    }
+  }, [tab, loadAddresses]);
+
   async function handleSave() {
     setSaving(true);
     setError(null);
     setSaved(false);
     try {
-      const updated = await apiClient.patch<ProfileData>('/users/profile', { name, phone: phone || undefined });
+      const updated = await apiClient.patch<ProfileData>('/users/profile', {
+        name,
+        phone: phone || undefined,
+      });
       setProfile(updated);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -85,8 +132,56 @@ export function ProfileView() {
     router.push('/');
   }
 
+  async function handleSaveAddress() {
+    setAddressError(null);
+    if (
+      !addressForm.name.trim() ||
+      !addressForm.phone.trim() ||
+      !addressForm.addressLine.trim() ||
+      !addressForm.city.trim() ||
+      !addressForm.province.trim() ||
+      !addressForm.postalCode.trim()
+    ) {
+      setAddressError('กรุณากรอกข้อมูลที่อยู่ให้ครบ');
+      return;
+    }
+    setAddressSaving(true);
+    try {
+      await apiClient.post('/users/addresses', {
+        name: addressForm.name.trim(),
+        phone: addressForm.phone.trim(),
+        addressLine: addressForm.addressLine.trim(),
+        city: addressForm.city.trim(),
+        province: addressForm.province.trim(),
+        postalCode: addressForm.postalCode.trim(),
+        country: addressForm.country.trim() || 'TH',
+        isDefault: addressForm.isDefault,
+      });
+      setShowAddressForm(false);
+      setAddressForm(emptyForm);
+      await loadAddresses();
+    } catch (err) {
+      setAddressError(err instanceof Error ? err.message : 'บันทึกที่อยู่ไม่สำเร็จ');
+    } finally {
+      setAddressSaving(false);
+    }
+  }
+
+  async function handleDeleteAddress(id: string) {
+    try {
+      await apiClient.delete(`/users/addresses/${id}`);
+      await loadAddresses();
+    } catch (err) {
+      setAddressError(err instanceof Error ? err.message : 'ลบที่อยู่ไม่สำเร็จ');
+    }
+  }
+
   if (loading) {
-    return <div className="mx-auto max-w-4xl px-4 py-16 text-center text-sm text-slate-400">กำลังโหลด...</div>;
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-16 text-center text-sm text-slate-400">
+        กำลังโหลด...
+      </div>
+    );
   }
 
   if (!profile) {
@@ -101,7 +196,11 @@ export function ProfileView() {
     <div className="mx-auto max-w-4xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-900">บัญชีของฉัน</h1>
-        <button onClick={handleLogout} className="text-sm font-medium text-red-600 hover:underline">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="text-sm font-medium text-red-600 hover:underline"
+        >
           ออกจากระบบ
         </button>
       </div>
@@ -111,6 +210,7 @@ export function ProfileView() {
           {TABS.map((t) => (
             <button
               key={t.key}
+              type="button"
               onClick={() => setTab(t.key)}
               className={`rounded-md px-3 py-2 text-left text-sm font-medium ${
                 tab === t.key ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'
@@ -122,7 +222,9 @@ export function ProfileView() {
         </nav>
 
         <div className="rounded-xl border border-slate-200 bg-white p-6">
-          {error && <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+          {error && (
+            <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
+          )}
 
           {tab === 'info' && (
             <div className="flex flex-col gap-4">
@@ -158,6 +260,7 @@ export function ProfileView() {
                 </div>
               </div>
               <button
+                type="button"
                 onClick={handleSave}
                 disabled={saving}
                 className="mt-2 w-fit rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
@@ -169,27 +272,154 @@ export function ProfileView() {
 
           {tab === 'address' && (
             <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold text-slate-900">ที่อยู่ของฉัน</h2>
-                <button className="rounded-md bg-teal-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-teal-800">
-                  + เพิ่มที่อยู่ใหม่
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddressForm((v) => !v);
+                    setAddressError(null);
+                    setAddressForm({
+                      ...emptyForm,
+                      name: profile.name,
+                      phone: profile.phone ?? '',
+                      isDefault: addresses.length === 0,
+                    });
+                  }}
+                  className="rounded-md bg-teal-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-teal-800"
+                >
+                  {showAddressForm ? 'ปิดฟอร์ม' : '+ เพิ่มที่อยู่ใหม่'}
                 </button>
               </div>
-              <p className="text-sm text-slate-400">ยังไม่มีที่อยู่จัดส่งที่บันทึกไว้</p>
+
+              {addressError && (
+                <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{addressError}</div>
+              )}
+
+              {showAddressForm && (
+                <div className="rounded-lg border border-teal-100 bg-teal-50/40 p-4">
+                  <p className="mb-3 text-sm font-medium text-slate-800">กรอกที่อยู่จัดส่ง</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <input
+                      type="text"
+                      placeholder="ชื่อ-นามสกุลผู้รับ *"
+                      value={addressForm.name}
+                      onChange={(e) => setAddressForm((f) => ({ ...f, name: e.target.value }))}
+                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600"
+                    />
+                    <input
+                      type="tel"
+                      placeholder="เบอร์โทร *"
+                      value={addressForm.phone}
+                      onChange={(e) => setAddressForm((f) => ({ ...f, phone: e.target.value }))}
+                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600"
+                    />
+                    <input
+                      type="text"
+                      placeholder="ที่อยู่ (บ้านเลขที่ ถนน) *"
+                      value={addressForm.addressLine}
+                      onChange={(e) =>
+                        setAddressForm((f) => ({ ...f, addressLine: e.target.value }))
+                      }
+                      className="sm:col-span-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600"
+                    />
+                    <input
+                      type="text"
+                      placeholder="เขต/อำเภอ หรือ ตำบล *"
+                      value={addressForm.city}
+                      onChange={(e) => setAddressForm((f) => ({ ...f, city: e.target.value }))}
+                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600"
+                    />
+                    <input
+                      type="text"
+                      placeholder="จังหวัด *"
+                      value={addressForm.province}
+                      onChange={(e) => setAddressForm((f) => ({ ...f, province: e.target.value }))}
+                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600"
+                    />
+                    <input
+                      type="text"
+                      placeholder="รหัสไปรษณีย์ *"
+                      value={addressForm.postalCode}
+                      onChange={(e) =>
+                        setAddressForm((f) => ({ ...f, postalCode: e.target.value }))
+                      }
+                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600"
+                    />
+                    <label className="flex items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={addressForm.isDefault}
+                        onChange={(e) =>
+                          setAddressForm((f) => ({ ...f, isDefault: e.target.checked }))
+                        }
+                      />
+                      ตั้งเป็นที่อยู่หลัก
+                    </label>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveAddress}
+                      disabled={addressSaving}
+                      className="rounded-md bg-teal-700 px-5 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
+                    >
+                      {addressSaving ? 'กำลังบันทึก...' : 'บันทึกที่อยู่'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddressForm(false)}
+                      className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                    >
+                      ยกเลิก
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {addresses.length === 0 && !showAddressForm ? (
+                <p className="text-sm text-slate-400">ยังไม่มีที่อยู่จัดส่งที่บันทึกไว้</p>
+              ) : (
+                <ul className="flex flex-col gap-3">
+                  {addresses.map((a) => (
+                    <li
+                      key={a.id}
+                      className="rounded-lg border border-slate-200 p-3 text-sm text-slate-700"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-medium text-slate-900">
+                            {a.name}{' '}
+                            {a.isDefault && (
+                              <span className="ml-1 rounded bg-teal-100 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800">
+                                หลัก
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-slate-500">{a.phone}</p>
+                          <p className="mt-1">
+                            {a.addressLine} {a.city} {a.province} {a.postalCode}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAddress(a.id)}
+                          className="shrink-0 text-xs text-red-600 hover:underline"
+                        >
+                          ลบ
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
           {tab === 'security' && (
             <div className="flex flex-col gap-4">
               <h2 className="text-sm font-semibold text-slate-900">เปลี่ยนรหัสผ่าน</h2>
-              <div className="grid gap-4 sm:max-w-sm">
-                <input type="password" placeholder="รหัสผ่านปัจจุบัน" className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600" />
-                <input type="password" placeholder="รหัสผ่านใหม่" className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600" />
-                <input type="password" placeholder="ยืนยันรหัสผ่านใหม่" className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600" />
-              </div>
-              <button className="w-fit rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800">
-                อัปเดตรหัสผ่าน
-              </button>
+              <p className="text-sm text-slate-400">ฟีเจอร์นี้จะเปิดใช้เร็วๆ นี้</p>
             </div>
           )}
         </div>
