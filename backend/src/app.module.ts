@@ -17,6 +17,7 @@ import { VelRepeatModule } from './velrepeat/velrepeat.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { PlatformSettingsModule } from './platform-settings/platform-settings.module';
+import { PaymentsModule } from './payments/payments.module';
 import { EventsModule } from './events/events.module';
 
 @Module({
@@ -57,6 +58,7 @@ import { EventsModule } from './events/events.module';
     UploadsModule,
     AnalyticsModule,
     PlatformSettingsModule,
+    PaymentsModule,
   ],
 })
 export class AppModule {}

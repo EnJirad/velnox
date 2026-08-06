@@ -364,18 +364,22 @@ CREATE TABLE "merchant_reports" (
 -- =========================
 
 CREATE TABLE "platform_settings" (
-  "id"                     TEXT PRIMARY KEY DEFAULT 'default',
-  "platform_name"          TEXT NOT NULL DEFAULT 'Velnox Commerce Platform',
-  "commission_percent"     DECIMAL(5, 2) NOT NULL DEFAULT 5,
+  "id" TEXT PRIMARY KEY DEFAULT 'default',
+  "platform_name" TEXT NOT NULL DEFAULT 'Velnox Commerce Platform',
+  "commission_percent" DECIMAL(5,2) NOT NULL DEFAULT 5,
   "auto_approve_merchants" BOOLEAN NOT NULL DEFAULT false,
   "require_product_review" BOOLEAN NOT NULL DEFAULT true,
-  "payment_credit_card"    BOOLEAN NOT NULL DEFAULT true,
-  "payment_prompt_pay"     BOOLEAN NOT NULL DEFAULT true,
-  "payment_bank_transfer"  BOOLEAN NOT NULL DEFAULT true,
-  "payment_cod"            BOOLEAN NOT NULL DEFAULT true,
-  "created_at"             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "updated_at"             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "auto_approve_products"  BOOLEAN NOT NULL DEFAULT false
+  "payment_credit_card" BOOLEAN NOT NULL DEFAULT true,
+  "payment_prompt_pay" BOOLEAN NOT NULL DEFAULT true,
+  "payment_bank_transfer" BOOLEAN NOT NULL DEFAULT true,
+  "payment_cod" BOOLEAN NOT NULL DEFAULT true,
+  "prompt_pay_id" TEXT,
+  "bank_account_name" TEXT,
+  "bank_account_number" TEXT,
+  "bank_name" TEXT,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "auto_approve_products" BOOLEAN NOT NULL DEFAULT false
 );
 
 INSERT INTO "platform_settings" ("id") VALUES ('default')

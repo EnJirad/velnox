@@ -39,4 +39,24 @@ export class UpdatePlatformSettingsDto {
   @IsOptional()
   @IsBoolean()
   paymentCod?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  promptPayId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  bankAccountName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  bankAccountNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  bankName?: string;
 }

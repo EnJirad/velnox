@@ -503,5 +503,11 @@ model PlatformSettings {
   updatedAt            DateTime @updatedAt @map("updated_at")
   autoApproveProducts  Boolean  @default(false) @map("auto_approve_products")
 
+  /// เบอร์ PromptPay หรือเลขบัตร 13 หลัก — ใช้สร้าง dynamic QR
+  promptPayId          String?  @map("prompt_pay_id")
+  bankAccountName      String?  @map("bank_account_name")
+  bankAccountNumber    String?  @map("bank_account_number")
+  bankName             String?  @map("bank_name")
+
   @@map("platform_settings")
 }

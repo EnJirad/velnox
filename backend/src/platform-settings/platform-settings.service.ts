@@ -4,24 +4,30 @@ import { UpdatePlatformSettingsDto } from './dto/update-platform-settings.dto';
 
 const DEFAULT_ID = 'default';
 
+type SettingsRow = {
+  id: string;
+  platformName: string;
+  commissionPercent: { toString(): string } | number;
+  autoApproveMerchants: boolean;
+  requireProductReview: boolean;
+  autoApproveProducts?: boolean;
+  paymentCreditCard: boolean;
+  paymentPromptPay: boolean;
+  paymentBankTransfer: boolean;
+  paymentCod: boolean;
+  promptPayId?: string | null;
+  bankAccountName?: string | null;
+  bankAccountNumber?: string | null;
+  bankName?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 @Injectable()
 export class PlatformSettingsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private serialize(row: {
-    id: string;
-    platformName: string;
-    commissionPercent: { toString(): string } | number;
-    autoApproveMerchants: boolean;
-    requireProductReview: boolean;
-    autoApproveProducts?: boolean;
-    paymentCreditCard: boolean;
-    paymentPromptPay: boolean;
-    paymentBankTransfer: boolean;
-    paymentCod: boolean;
-    createdAt: Date;
-    updatedAt: Date;
-  }) {
+  private serialize(row: SettingsRow) {
     return {
       id: row.id,
       platformName: row.platformName,
@@ -33,6 +39,10 @@ export class PlatformSettingsService {
       paymentPromptPay: row.paymentPromptPay,
       paymentBankTransfer: row.paymentBankTransfer,
       paymentCod: row.paymentCod,
+      promptPayId: row.promptPayId ?? null,
+      bankAccountName: row.bankAccountName ?? null,
+      bankAccountNumber: row.bankAccountNumber ?? null,
+      bankName: row.bankName ?? null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
@@ -44,7 +54,7 @@ export class PlatformSettingsService {
       update: {},
       create: { id: DEFAULT_ID },
     });
-    return this.serialize(row as Parameters<typeof this.serialize>[0]);
+    return this.serialize(row as SettingsRow);
   }
 
   async update(dto: UpdatePlatformSettingsDto) {
@@ -66,6 +76,10 @@ export class PlatformSettingsService {
         ? { paymentBankTransfer: dto.paymentBankTransfer }
         : {}),
       ...(dto.paymentCod !== undefined ? { paymentCod: dto.paymentCod } : {}),
+      ...(dto.promptPayId !== undefined ? { promptPayId: dto.promptPayId } : {}),
+      ...(dto.bankAccountName !== undefined ? { bankAccountName: dto.bankAccountName } : {}),
+      ...(dto.bankAccountNumber !== undefined ? { bankAccountNumber: dto.bankAccountNumber } : {}),
+      ...(dto.bankName !== undefined ? { bankName: dto.bankName } : {}),
     };
 
     const row = await this.prisma.platformSettings.upsert({
@@ -73,6 +87,6 @@ export class PlatformSettingsService {
       create: { id: DEFAULT_ID, ...data },
       update: data,
     });
-    return this.serialize(row as Parameters<typeof this.serialize>[0]);
+    return this.serialize(row as SettingsRow);
   }
 }
