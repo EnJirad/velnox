@@ -46,6 +46,7 @@ export function PromptPayQrPanel({ orderId, orderNumber, onClose, modal = false 
         if (cancelled) return;
         setData(res);
         if (res.slipUrl) setSlipDone(true);
+        if ((res as { needsReslip?: boolean }).needsReslip) setSlipDone(false);
         if (res.expiresAt) {
           const left = new Date(res.expiresAt).getTime() - Date.now();
           setRemainingMs(Math.max(0, left));
@@ -141,6 +142,17 @@ export function PromptPayQrPanel({ orderId, orderNumber, onClose, modal = false 
         </div>
       )}
 
+      
+      {data && (data as { needsReslip?: boolean; reslipReason?: string | null }).needsReslip && !slipDone && (
+        <div className="w-full rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <p className="font-semibold">กรุณาอัปโหลดสลิปใหม่</p>
+          <p className="text-xs">
+            {(data as { reslipReason?: string | null }).reslipReason ||
+              'สลิปก่อนหน้าไม่ถูกต้อง'}
+          </p>
+        </div>
+      )}
+
       {loading && <p className="py-8 text-sm text-slate-400">กำลังสร้าง QR...</p>}
 
       {error && (
@@ -175,11 +187,15 @@ export function PromptPayQrPanel({ orderId, orderNumber, onClose, modal = false 
             </button>
             <button
               type="button"
-              disabled={uploading || slipDone}
+              disabled={uploading}
               onClick={() => fileRef.current?.click()}
               className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
             >
-              {uploading ? 'กำลังอัปโหลด...' : slipDone ? 'อัปโหลดสลิปแล้ว' : 'อัปโหลดสลิป'}
+              {uploading
+                ? 'กำลังอัปโหลด...'
+                : slipDone
+                  ? 'แก้ไข / อัปโหลดสลิปใหม่'
+                  : 'อัปโหลดสลิป'}
             </button>
             <input
               ref={fileRef}

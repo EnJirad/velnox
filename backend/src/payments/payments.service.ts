@@ -112,6 +112,15 @@ export class PaymentsService {
       bankName: settings?.bankName ?? null,
       qrDataUrl: qr.qrDataUrl,
       slipUrl: (payment as { slipUrl?: string | null } | null)?.slipUrl ?? null,
+      needsReslip:
+        typeof payment?.transactionId === 'string' &&
+        payment.transactionId.startsWith('NEEDS_RESLIP'),
+      reslipReason: (() => {
+        const t = payment?.transactionId;
+        if (typeof t === 'string' && t.startsWith('NEEDS_RESLIP:')) return t.slice('NEEDS_RESLIP:'.length);
+        if (t === 'NEEDS_RESLIP') return 'สลิปไม่ถูกต้อง กรุณาอัปโหลดใหม่';
+        return null;
+      })(),
       createdAt: order.createdAt.toISOString(),
       expiresAt: window.expiresAt.toISOString(),
       paymentWindowHours: window.paymentWindowHours,
@@ -153,6 +162,7 @@ export class PaymentsService {
       status: 'PENDING' as const,
       slipUrl: url,
       slipUploadedAt: new Date(),
+      transactionId: null as string | null,
     };
 
     if (order.payment) {
@@ -178,6 +188,123 @@ export class PaymentsService {
       message: 'อัปโหลดสลิปแล้ว รอเจ้าหน้าที่ตรวจสอบ',
     };
   }
+
+  /** รายการที่มีสลิปรอตรวจ */
+  async listPendingSlips() {
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        status: 'PENDING',
+        slipUrl: { not: null },
+      },
+      orderBy: { slipUploadedAt: 'desc' },
+      include: {
+        order: {
+          select: {
+            id: true,
+            orderNumber: true,
+            total: true,
+            paymentStatus: true,
+            status: true,
+            createdAt: true,
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
+      },
+    });
+    return payments.map((p) => ({
+      paymentId: p.id,
+      orderId: p.orderId,
+      orderNumber: p.order.orderNumber,
+      amount: Number(p.amount),
+      method: p.method,
+      slipUrl: p.slipUrl,
+      slipUploadedAt: p.slipUploadedAt,
+      transactionId: p.transactionId,
+      customer: p.order.user,
+      orderStatus: p.order.status,
+      paymentStatus: p.order.paymentStatus,
+      orderCreatedAt: p.order.createdAt,
+    }));
+  }
+
+  async approvePayment(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { payment: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.paymentStatus === 'PAID') {
+      return { success: true, orderId, message: 'Already paid' };
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.order.update({
+        where: { id: orderId },
+        data: { paymentStatus: 'PAID', status: order.status === 'PENDING' ? 'CONFIRMED' : order.status },
+      }),
+      order.payment
+        ? this.prisma.payment.update({
+            where: { id: order.payment.id },
+            data: {
+              status: 'PAID',
+              paidAt: new Date(),
+              transactionId: order.payment.transactionId === 'NEEDS_RESLIP' ? null : order.payment.transactionId,
+            },
+          })
+        : this.prisma.payment.create({
+            data: {
+              orderId,
+              method: 'PROMPTPAY_QR',
+              amount: order.total,
+              status: 'PAID',
+              paidAt: new Date(),
+            },
+          }),
+    ]);
+
+    return {
+      success: true,
+      orderId,
+      message: 'อนุมัติการชำระเงินแล้ว',
+    };
+  }
+
+  /** ปฏิเสธสลิป — ล้างสลิป แจ้งลูกค้าให้อัปโหลดใหม่ */
+  async rejectSlip(orderId: string, reason?: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { payment: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.paymentStatus === 'PAID') {
+      throw new BadRequestException('Order is already paid');
+    }
+    if (!order.payment?.slipUrl) {
+      throw new BadRequestException('No slip to reject');
+    }
+
+    const note = reason?.trim()
+      ? `NEEDS_RESLIP:${reason.trim().slice(0, 180)}`
+      : 'NEEDS_RESLIP';
+
+    await this.prisma.payment.update({
+      where: { id: order.payment.id },
+      data: {
+        slipUrl: null,
+        slipUploadedAt: null,
+        status: 'PENDING',
+        transactionId: note,
+      },
+    });
+
+    return {
+      success: true,
+      orderId,
+      message: 'ปฏิเสธสลิปแล้ว ลูกค้าต้องอัปโหลดสลิปใหม่',
+      reason: reason?.trim() || null,
+    };
+  }
+
 }
 
 function maskId(id: string): string {

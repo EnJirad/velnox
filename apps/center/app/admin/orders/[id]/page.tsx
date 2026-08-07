@@ -27,6 +27,9 @@ type AdminOrder = {
     method: string;
     status: string;
     transactionId?: string | null;
+    slipUrl?: string | null;
+    slipUploadedAt?: string | null;
+    amount?: number | string;
   } | null;
   items: {
     id: string;
@@ -60,6 +63,8 @@ export default function AdminOrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [slipBusy, setSlipBusy] = useState(false);
+  const [slipMsg, setSlipMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -84,6 +89,68 @@ export default function AdminOrderDetailPage() {
       setError(err instanceof Error ? err.message : 'อัปเดตสถานะไม่สำเร็จ');
     } finally {
       setBusy(false);
+    }
+  }
+
+
+  async function approvePayment() {
+    if (!order) return;
+    setSlipBusy(true);
+    setSlipMsg(null);
+    setError(null);
+    try {
+      await apiClient.patch(`/payments/admin/orders/${order.id}/approve`, {});
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              paymentStatus: 'PAID',
+              status: prev.status === 'PENDING' ? 'CONFIRMED' : prev.status,
+              payment: prev.payment
+                ? { ...prev.payment, status: 'PAID' }
+                : prev.payment,
+            }
+          : prev,
+      );
+      setSlipMsg('อนุมัติการชำระเงินแล้ว');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'อนุมัติไม่สำเร็จ');
+    } finally {
+      setSlipBusy(false);
+    }
+  }
+
+  async function rejectSlip() {
+    if (!order) return;
+    const reason = window.prompt('เหตุผลที่สลิปไม่ผ่าน (ลูกค้าจะเห็นเมื่ออัปโหลดใหม่)', 'สลิปไม่ชัดเจนหรือยอดไม่ตรง');
+    if (reason === null) return;
+    setSlipBusy(true);
+    setSlipMsg(null);
+    setError(null);
+    try {
+      await apiClient.patch(`/payments/admin/orders/${order.id}/reject-slip`, {
+        reason: reason || undefined,
+      });
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              payment: prev.payment
+                ? {
+                    ...prev.payment,
+                    slipUrl: null,
+                    slipUploadedAt: null,
+                    transactionId: reason ? `NEEDS_RESLIP:${reason}` : 'NEEDS_RESLIP',
+                  }
+                : prev.payment,
+            }
+          : prev,
+      );
+      setSlipMsg('แจ้งลูกค้าให้อัปโหลดสลิปใหม่แล้ว');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ปฏิเสธสลิปไม่สำเร็จ');
+    } finally {
+      setSlipBusy(false);
     }
   }
 
@@ -168,6 +235,70 @@ export default function AdminOrderDetailPage() {
               order.paymentStatus}
           </p>
         </div>
+      </div>
+
+
+      {/* สลิปโอนเงิน */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <p className="text-sm font-semibold text-slate-900">สลิป / การชำระเงิน</p>
+        {slipMsg && (
+          <p className="mt-2 text-sm font-medium text-emerald-600">{slipMsg}</p>
+        )}
+        {order.payment?.slipUrl ? (
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start">
+            <a
+              href={order.payment.slipUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="block max-w-xs shrink-0"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={order.payment.slipUrl}
+                alt="สลิปโอนเงิน"
+                className="max-h-80 w-full rounded-lg border border-slate-200 object-contain"
+              />
+            </a>
+            <div className="flex flex-col gap-2 text-sm">
+              <p className="text-slate-600">
+                กดที่รูปเพื่อเปิดขนาดเต็ม
+                {order.payment.slipUploadedAt && (
+                  <span className="block text-xs text-slate-400">
+                    อัปโหลด: {formatDate(order.payment.slipUploadedAt)}
+                  </span>
+                )}
+              </p>
+              {order.paymentStatus !== 'PAID' && (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={slipBusy}
+                    onClick={() => void approvePayment()}
+                    className="rounded-md bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    อนุมัติชำระเงิน
+                  </button>
+                  <button
+                    type="button"
+                    disabled={slipBusy}
+                    onClick={() => void rejectSlip()}
+                    className="rounded-md border border-red-300 px-4 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    สลิปไม่ถูกต้อง — แจ้งอัปโหลดใหม่
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-slate-400">
+            {order.payment?.transactionId?.startsWith('NEEDS_RESLIP')
+              ? 'รอลูกค้าอัปโหลดสลิปใหม่ (สลิปก่อนหน้าถูกปฏิเสธ)'
+              : order.paymentStatus === 'PAID'
+                ? 'ชำระแล้ว'
+                : 'ยังไม่มีสลิปจากลูกค้า'}
+          </p>
+        )}
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white">
