@@ -10,6 +10,9 @@ export type PromptPayQrResponse = {
   bankName: string | null;
   qrDataUrl: string;
   slipUrl?: string | null;
+  createdAt?: string;
+  expiresAt?: string;
+  paymentWindowHours?: number;
   message: string;
 };
 
@@ -27,9 +30,7 @@ export async function submitPaymentSlip(orderId: string, slipUrl: string) {
   }>(`/payments/orders/${orderId}/slip`, { slipUrl });
 }
 
-/** อัปโหลดรูปสลิปไป Cloudinary แล้วบันทึกกับออเดอร์ */
 export async function uploadAndSubmitSlip(orderId: string, file: File) {
-  // folder slips — ต้องเปิดใน backend uploads แล้ว
-  const uploaded = await uploadImage(file as File & { /* folder */ }, 'slips' as 'products');
+  const uploaded = await uploadImage(file, 'slips' as 'products');
   return submitPaymentSlip(orderId, uploaded.url);
 }

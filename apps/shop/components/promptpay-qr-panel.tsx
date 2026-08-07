@@ -16,28 +16,47 @@ type Props = {
   modal?: boolean;
 };
 
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return '00:00:00';
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
 export function PromptPayQrPanel({ orderId, orderNumber, onClose, modal = false }: Props) {
   const [data, setData] = useState<PromptPayQrResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [slipDone, setSlipDone] = useState(false);
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
+  const [expired, setExpired] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setExpired(false);
     fetchPromptPayQr(orderId)
       .then((res) => {
-        if (!cancelled) {
-          setData(res);
-          if (res.slipUrl) setSlipDone(true);
+        if (cancelled) return;
+        setData(res);
+        if (res.slipUrl) setSlipDone(true);
+        if (res.expiresAt) {
+          const left = new Date(res.expiresAt).getTime() - Date.now();
+          setRemainingMs(Math.max(0, left));
+          if (left <= 0) setExpired(true);
         }
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : 'โหลด QR ไม่สำเร็จ');
+          const msg = err instanceof ApiError ? err.message : 'โหลด QR ไม่สำเร็จ';
+          setError(msg);
+          if (msg.includes('หมดเวลา') || msg.includes('24')) setExpired(true);
         }
       })
       .finally(() => {
@@ -48,8 +67,25 @@ export function PromptPayQrPanel({ orderId, orderNumber, onClose, modal = false 
     };
   }, [orderId]);
 
+  // นับถอยหลังทุก 1 วินาที
+  useEffect(() => {
+    if (!data?.expiresAt || expired) return;
+    const tick = () => {
+      const left = new Date(data.expiresAt!).getTime() - Date.now();
+      if (left <= 0) {
+        setRemainingMs(0);
+        setExpired(true);
+      } else {
+        setRemainingMs(left);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [data?.expiresAt, expired]);
+
   function handleDownloadQr() {
-    if (!data?.qrDataUrl) return;
+    if (!data?.qrDataUrl || expired) return;
     const a = document.createElement('a');
     a.href = data.qrDataUrl;
     a.download = `promptpay-${data.orderNumber || orderId}.png`;
@@ -57,7 +93,7 @@ export function PromptPayQrPanel({ orderId, orderNumber, onClose, modal = false 
   }
 
   async function handleSlipSelected(file: File | undefined) {
-    if (!file) return;
+    if (!file || expired) return;
     setUploading(true);
     setError(null);
     try {
@@ -81,13 +117,37 @@ export function PromptPayQrPanel({ orderId, orderNumber, onClose, modal = false 
         <span className="font-medium text-teal-700">#{orderNumber ?? data?.orderNumber ?? '—'}</span>
       </p>
 
+      {/* Countdown 24h */}
+      {(remainingMs !== null || expired) && (
+        <div
+          className={`w-full rounded-lg px-3 py-2 text-sm ${
+            expired
+              ? 'bg-red-50 text-red-700'
+              : remainingMs !== null && remainingMs < 60 * 60 * 1000
+                ? 'bg-amber-50 text-amber-800'
+                : 'bg-slate-50 text-slate-700'
+          }`}
+        >
+          {expired ? (
+            <span className="font-semibold">หมดเวลาชำระเงินแล้ว (24 ชม.) — กรุณาสั่งซื้อใหม่</span>
+          ) : (
+            <>
+              <span className="text-xs text-slate-500">เวลาที่เหลือในการชำระเงิน (24 ชม.)</span>
+              <p className="font-mono text-xl font-bold tracking-wider">
+                {formatCountdown(remainingMs ?? 0)}
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
       {loading && <p className="py-8 text-sm text-slate-400">กำลังสร้าง QR...</p>}
 
       {error && (
         <div className="w-full rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
       )}
 
-      {data && !loading && (
+      {data && !loading && !expired && (
         <>
           <p className="text-2xl font-bold text-teal-700">{formatCurrency(data.amount)}</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -135,10 +195,6 @@ export function PromptPayQrPanel({ orderId, orderNumber, onClose, modal = false 
               ส่งสลิปแล้ว รอเจ้าหน้าที่ตรวจสอบ
             </p>
           )}
-
-          <p className="mt-2 max-w-sm text-xs text-amber-700">
-            โอนแล้วให้อัปโหลดสลิป — หรือกลับมาเปิด QR ได้จาก「คำสั่งซื้อของฉัน」
-          </p>
         </>
       )}
 
