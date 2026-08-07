@@ -65,5 +65,10 @@ export interface ApiOrderItem {
     status: string;
     total: string;
     createdAt: string;
+    paymentStatus?: string;
+    trackingNumber?: string | null;
+    carrier?: string | null;
+    shippingName?: string | null;
+    payment?: { status?: string; method?: string } | null;
   };
 }

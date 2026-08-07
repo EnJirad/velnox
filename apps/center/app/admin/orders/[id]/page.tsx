@@ -49,7 +49,6 @@ type AdminOrder = {
 
 const STATUSES: OrderStatus[] = [
   'PENDING',
-  'CONFIRMED',
   'PROCESSING',
   'SHIPPED',
   'DELIVERED',
@@ -105,14 +104,17 @@ export default function AdminOrderDetailPage() {
           ? {
               ...prev,
               paymentStatus: 'PAID',
-              status: prev.status === 'PENDING' ? 'CONFIRMED' : prev.status,
+              status:
+                prev.status === 'PENDING' || prev.status === 'CONFIRMED'
+                  ? 'PROCESSING'
+                  : prev.status,
               payment: prev.payment
                 ? { ...prev.payment, status: 'PAID' }
                 : prev.payment,
             }
           : prev,
       );
-      setSlipMsg('อนุมัติการชำระเงินแล้ว');
+      setSlipMsg('อนุมัติแล้ว — สถานะกำลังจัดเตรียม และแจ้งร้านค้าแล้ว');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'อนุมัติไม่สำเร็จ');
     } finally {

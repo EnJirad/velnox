@@ -31,6 +31,9 @@ const ORDER_LIST_SELECT = {
   total: true,
   paymentStatus: true,
   createdAt: true,
+  trackingNumber: true,
+  carrier: true,
+  shippingName: true,
 } as const;
 
 @Injectable()
@@ -230,7 +233,7 @@ export class OrdersService {
             images: { orderBy: { sortOrder: 'asc' }, take: 1 },
           },
         },
-        order: { select: { ...ORDER_LIST_SELECT } },
+        order: { select: { ...ORDER_LIST_SELECT, payment: true } },
       },
       orderBy: { order: { createdAt: 'desc' } },
     });
@@ -256,6 +259,73 @@ export class OrdersService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+
+  /**
+   * ร้านกรอกเลขพัสดุ → ออเดอร์เป็น SHIPPED
+   * แจ้ง Shop + Center ผ่าน order:updated
+   */
+  async shipForMerchant(
+    userId: string,
+    orderId: string,
+    trackingNumber: string,
+    carrier?: string,
+  ) {
+    const merchant = await this.prisma.merchant.findUnique({ where: { userId } });
+    if (!merchant) {
+      throw new ForbiddenException('You do not have a merchant account');
+    }
+
+    const item = await this.prisma.orderItem.findFirst({
+      where: { orderId, merchantId: merchant.id },
+    });
+    if (!item) {
+      throw new ForbiddenException('Order does not belong to this merchant');
+    }
+
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    if (order.paymentStatus !== 'PAID') {
+      throw new BadRequestException('ออเดอร์ยังไม่ชำระเงิน');
+    }
+    if (order.status === 'CANCELLED' || order.status === 'DELIVERED') {
+      throw new BadRequestException('ไม่สามารถอัปเดตออเดอร์นี้ได้');
+    }
+
+    const tn = trackingNumber.trim();
+    if (tn.length < 3) {
+      throw new BadRequestException('กรุณากรอกเลขพัสดุ');
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        trackingNumber: tn,
+        carrier: carrier?.trim() || null,
+        status: 'SHIPPED',
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        payment: true,
+        items: {
+          include: {
+            product: { select: { id: true, name: true } },
+            merchant: { select: { id: true } },
+          },
+        },
+      },
+    });
+
+    this.events.emitOrderUpdated({
+      ...updated,
+      notify: 'ORDER_SHIPPED',
+      message: 'ร้านค้าอัปเดตเลขพัสดุแล้ว — สินค้ากำลังจัดส่ง',
+    });
+
+    return updated;
   }
 
   async updateStatus(id: string, dto: UpdateOrderStatusDto) {

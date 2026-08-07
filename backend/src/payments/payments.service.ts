@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { EventsGateway } from '../events/events.gateway';
 import { createPromptPayQrDataUrl } from './promptpay-qr.util';
 
 /** หน้าต่างชำระ PromptPay หลังสร้างออเดอร์ (ชั่วโมง) */
@@ -11,7 +12,10 @@ const PAYMENT_WINDOW_HOURS = 24;
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventsGateway,
+  ) {}
 
   private paymentWindow(createdAt: Date) {
     const expiresAt = new Date(
@@ -237,10 +241,19 @@ export class PaymentsService {
       return { success: true, orderId, message: 'Already paid' };
     }
 
+    // อนุมัติชำระ → PAID + กำลังจัดเตรียมทันที (ไม่ใช้สถานะยืนยันแล้ว)
+    const nextStatus =
+      order.status === 'PENDING' || order.status === 'CONFIRMED'
+        ? 'PROCESSING'
+        : order.status;
+
     await this.prisma.$transaction([
       this.prisma.order.update({
         where: { id: orderId },
-        data: { paymentStatus: 'PAID', status: order.status === 'PENDING' ? 'CONFIRMED' : order.status },
+        data: {
+          paymentStatus: 'PAID',
+          status: nextStatus,
+        },
       }),
       order.payment
         ? this.prisma.payment.update({
@@ -248,7 +261,12 @@ export class PaymentsService {
             data: {
               status: 'PAID',
               paidAt: new Date(),
-              transactionId: order.payment.transactionId === 'NEEDS_RESLIP' ? null : order.payment.transactionId,
+              transactionId:
+                order.payment.transactionId === 'NEEDS_RESLIP' ||
+                (typeof order.payment.transactionId === 'string' &&
+                  order.payment.transactionId.startsWith('NEEDS_RESLIP'))
+                  ? null
+                  : order.payment.transactionId,
             },
           })
         : this.prisma.payment.create({
@@ -262,10 +280,35 @@ export class PaymentsService {
           }),
     ]);
 
+    const updated = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        payment: true,
+        items: {
+          include: {
+            product: { select: { id: true, name: true } },
+            merchant: { select: { id: true, userId: true } },
+          },
+        },
+      },
+    });
+
+    // แจ้ง Center + Merchant ผ่าน WebSocket (merchant ฟัง order:updated อยู่แล้ว)
+    if (updated) {
+      this.events.emitOrderUpdated({
+        ...updated,
+        notify: 'PAYMENT_APPROVED',
+        message: 'ได้รับการยืนยันชำระเงินแล้ว — กรุณาจัดเตรียมพัสดุเพื่อจัดส่ง',
+      });
+    }
+
     return {
       success: true,
       orderId,
-      message: 'อนุมัติการชำระเงินแล้ว',
+      status: nextStatus,
+      paymentStatus: 'PAID',
+      message: 'อนุมัติแล้ว สถานะเป็นกำลังจัดเตรียม — แจ้งร้านค้าแล้ว',
     };
   }
 

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { ShipOrderDto } from './dto/ship-order.dto';
 import { CheckoutDto } from './dto/checkout.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -28,6 +29,22 @@ export class OrdersController {
   @Get('merchant')
   findForMerchant(@CurrentUser() user: AuthenticatedRequestUser) {
     return this.ordersService.findForMerchant(user.userId);
+  }
+
+
+  @Roles('MERCHANT')
+  @Patch('merchant/:orderId/ship')
+  ship(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Param('orderId') orderId: string,
+    @Body() dto: ShipOrderDto,
+  ) {
+    return this.ordersService.shipForMerchant(
+      user.userId,
+      orderId,
+      dto.trackingNumber,
+      dto.carrier,
+    );
   }
 
   @Roles('ADMIN', 'SUPER_ADMIN')

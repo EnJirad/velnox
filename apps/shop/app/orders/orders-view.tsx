@@ -95,6 +95,20 @@ export function OrdersView() {
                   {orderStatusLabel[order.status] ?? order.status}
                 </Badge>
               </div>
+              {(order as { trackingNumber?: string | null }).trackingNumber && (
+                <div className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <p className="text-xs text-slate-500">เลขพัสดุ</p>
+                  <p className="font-mono font-semibold">
+                    {(order as { trackingNumber?: string }).trackingNumber}
+                    {(order as { carrier?: string | null }).carrier
+                      ? ` · ${(order as { carrier?: string }).carrier}`
+                      : ''}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    คาดว่าจะได้รับภายใน 3–7 วัน
+                  </p>
+                </div>
+              )}
 
               {order.items && order.items.length > 0 && (
                 <ul className="mt-3 flex flex-col gap-2 border-b border-slate-50 pb-3">

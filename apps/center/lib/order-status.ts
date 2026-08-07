@@ -11,7 +11,7 @@ export type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 
 
 export const orderStatusLabel: Record<OrderStatus, string> = {
   PENDING: 'รอดำเนินการ',
-  CONFIRMED: 'ยืนยันแล้ว',
+  CONFIRMED: 'กำลังจัดเตรียม', // ไม่ใช้แล้ว — แสดงเหมือน PROCESSING
   PROCESSING: 'กำลังจัดเตรียม',
   SHIPPED: 'จัดส่งแล้ว',
   DELIVERED: 'ส่งสำเร็จ',
