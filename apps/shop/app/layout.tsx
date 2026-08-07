@@ -4,6 +4,7 @@ import { AuthProvider } from '@/components/providers/auth-provider';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { LanguageProvider } from '@/components/providers/language-provider';
 import { Navigation } from '@/components/layout/navigation';
+import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { Footer } from '@/components/layout/footer';
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Navigation />
                 <main className="flex-1">{children}</main>
                 <Footer />
+                <MobileBottomNav />
               </div>
             </AuthProvider>
           </ThemeProvider>
