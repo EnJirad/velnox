@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useLanguage } from '@/components/providers/language-provider';
 import { LanguageSwitcher } from './language-switcher';
 import { IconCart, IconClose, IconMenu, IconUser } from '@/components/icons';
+import { NotificationBell } from './notification-bell';
 
 export function Navigation() {
   const cartCount = useCartCount();
@@ -89,7 +90,8 @@ export function Navigation() {
             {accountLabel}
           </Link>
           <div className="hidden sm:block">
-            <LanguageSwitcher />
+            <NotificationBell />
+        <LanguageSwitcher />
           </div>
           <Link
             href="/cart"

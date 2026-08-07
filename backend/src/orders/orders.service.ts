@@ -36,6 +36,23 @@ const ORDER_LIST_SELECT = {
   shippingName: true,
 } as const;
 
+
+function normalizePaymentMethod(method?: string): string {
+  const m = (method || 'promptpay').trim();
+  const map: Record<string, string> = {
+    promptpay: 'PROMPTPAY_QR',
+    PROMPTPAY: 'PROMPTPAY_QR',
+    PROMPTPAY_QR: 'PROMPTPAY_QR',
+    card: 'CARD',
+    CARD: 'CARD',
+    cod: 'COD',
+    COD: 'COD',
+    bank_transfer: 'BANK_TRANSFER',
+    BANK_TRANSFER: 'BANK_TRANSFER',
+  };
+  return map[m] ?? map[m.toLowerCase()] ?? m;
+}
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -115,7 +132,7 @@ export class OrdersService {
           },
           payment: {
             create: {
-              method: paymentMethod,
+              method: normalizePaymentMethod(paymentMethod),
               amount: total,
               status: 'PENDING',
             },

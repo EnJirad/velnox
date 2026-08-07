@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatCurrency, formatDate } from '@velnox/utils';
 import { Badge } from '@velnox/ui';
 import { apiClient } from '@/lib/api-client';
 import { getMerchantSocket } from '@/lib/ws-client';
 import type { ApiOrderItem } from '@/lib/api-types';
+
+const CARRIERS = ['Flash Express', 'Kerry Express', 'Thailand Post', 'J&T', 'SPX', 'อื่นๆ'];
 
 const orderStatusLabel: Record<string, string> = {
   PENDING: 'รอดำเนินการ',
@@ -40,6 +42,11 @@ type Row = ApiOrderItem & {
 
 const FILTERS = ['ALL', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'PENDING', 'CANCELLED'];
 
+function csvEscape(v: string) {
+  if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+  return v;
+}
+
 export function OrdersView() {
   const [items, setItems] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +56,7 @@ export function OrdersView() {
   const [trackingDraft, setTrackingDraft] = useState<Record<string, string>>({});
   const [carrierDraft, setCarrierDraft] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [bulkCarrier, setBulkCarrier] = useState('Flash Express');
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -82,15 +90,67 @@ export function OrdersView() {
     };
   }, [load]);
 
-  const needPack = items.filter(
-    (i) =>
-      i.order &&
-      (i.order.status === 'PROCESSING' || i.order.status === 'CONFIRMED') &&
-      (i.order.paymentStatus === 'PAID' || i.order.payment?.status === 'PAID'),
+  const needPack = useMemo(
+    () =>
+      items.filter(
+        (i) =>
+          i.order &&
+          (i.order.status === 'PROCESSING' || i.order.status === 'CONFIRMED') &&
+          (i.order.paymentStatus === 'PAID' || i.order.payment?.status === 'PAID') &&
+          !i.order.trackingNumber,
+      ),
+    [items],
   );
+
+  // unique orders for packing (dedupe by order id)
+  const packOrders = useMemo(() => {
+    const map = new Map<string, Row>();
+    for (const i of needPack) {
+      if (i.order?.id) map.set(i.order.id, i);
+    }
+    return Array.from(map.values());
+  }, [needPack]);
 
   const filtered =
     filter === 'ALL' ? items : items.filter((i) => i.order?.status === filter);
+
+  function applyBulkCarrier() {
+    const next: Record<string, string> = { ...carrierDraft };
+    for (const row of packOrders) {
+      if (row.order?.id) next[row.order.id] = bulkCarrier;
+    }
+    setCarrierDraft(next);
+  }
+
+  function downloadCsvTemplate() {
+    const header = ['order_id', 'order_number', 'customer_name', 'product', 'qty', 'carrier', 'tracking_number'];
+    const lines = [header.join(',')];
+    const seen = new Set<string>();
+    for (const row of needPack) {
+      const o = row.order;
+      if (!o?.id || seen.has(o.id)) continue;
+      seen.add(o.id);
+      lines.push(
+        [
+          o.id,
+          o.orderNumber,
+          o.shippingName ?? '',
+          row.product?.name ?? '',
+          String(row.quantity),
+          carrierDraft[o.id] ?? bulkCarrier,
+          trackingDraft[o.id] ?? '',
+        ]
+          .map((x) => csvEscape(String(x)))
+          .join(','),
+      );
+    }
+    const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `velnox-tracking-template-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
 
   async function confirmShip(orderId: string) {
     const tn = (trackingDraft[orderId] ?? '').trim();
@@ -101,7 +161,8 @@ export function OrdersView() {
     setBusyId(orderId);
     setError(null);
     try {
-      await apiClient.patch(`/orders/merchant/${orderId}/ship`, {
+      // ใช้ POST กันบาง proxy ที่ไม่รองรับ PATCH
+      await apiClient.post(`/orders/merchant/${orderId}/ship`, {
         trackingNumber: tn,
         carrier: (carrierDraft[orderId] ?? '').trim() || undefined,
       });
@@ -135,13 +196,40 @@ export function OrdersView() {
         </button>
       </div>
 
-      {needPack.length > 0 && (
+      {packOrders.length > 0 && (
         <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
           <p className="font-semibold">
-            มี {needPack.length} รายการที่ชำระแล้ว — กรุณาจัดเตรียมพัสดุแล้วกรอกเลขพัสดุ
+            มี {packOrders.length} ออเดอร์ที่ชำระแล้ว — กรุณาจัดเตรียมพัสดุแล้วกรอกเลขพัสดุ
           </p>
-          <p className="text-xs text-teal-800">
-            กรอกเลขพัสดุแล้วกดยืนยัน สถานะจะเป็น「กำลังจัดส่ง」และแจ้งลูกค้า + Center
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <select
+              value={bulkCarrier}
+              onChange={(e) => setBulkCarrier(e.target.value)}
+              className="rounded border border-teal-300 bg-white px-2 py-1.5 text-xs"
+            >
+              {CARRIERS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={applyBulkCarrier}
+              className="rounded bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800"
+            >
+              ใช้ขนส่งนี้กับทุกรายการที่รอจัดส่ง
+            </button>
+            <button
+              type="button"
+              onClick={downloadCsvTemplate}
+              className="rounded border border-teal-600 px-3 py-1.5 text-xs font-semibold text-teal-800 hover:bg-white"
+            >
+              ดาวน์โหลด CSV เทมเพลตเลขพัสดุ
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-teal-800">
+            CSV มี order_id / ชื่อผู้รับ — กรอก tracking_number ใน Excel แล้วคัดลอกกลับมากรอก หรือกรอกทีละรายการด้านล่าง
           </p>
         </div>
       )}
@@ -178,7 +266,7 @@ export function OrdersView() {
                 <th className="px-4 py-3">ผู้รับ / สินค้า</th>
                 <th className="px-4 py-3">ยอด</th>
                 <th className="px-4 py-3">สถานะ</th>
-                <th className="px-4 py-3">เลขพัสดุ</th>
+                <th className="px-4 py-3">เลขพัสดุ / ขนส่ง</th>
               </tr>
             </thead>
             <tbody>
@@ -187,14 +275,14 @@ export function OrdersView() {
                 const canShip =
                   o &&
                   (o.status === 'PROCESSING' || o.status === 'CONFIRMED') &&
-                  (o.paymentStatus === 'PAID' || o.payment?.status === 'PAID');
+                  (o.paymentStatus === 'PAID' || o.payment?.status === 'PAID') &&
+                  !o.trackingNumber;
                 return (
                   <tr key={item.id} className="border-b border-slate-50 align-top last:border-0">
                     <td className="px-4 py-3">
                       <p className="font-medium text-slate-800">#{o?.orderNumber}</p>
-                      <p className="text-xs text-slate-400">
-                        {o ? formatDate(o.createdAt) : '-'}
-                      </p>
+                      <p className="text-[10px] text-slate-400 font-mono">{o?.id?.slice(0, 8)}…</p>
+                      <p className="text-xs text-slate-400">{o ? formatDate(o.createdAt) : '-'}</p>
                     </td>
                     <td className="px-4 py-3">
                       {o?.shippingName && (
@@ -212,33 +300,37 @@ export function OrdersView() {
                           {orderStatusLabel[o.status] ?? o.status}
                         </Badge>
                       )}
-                      {o?.paymentStatus === 'PAID' && (
+                      {(o?.paymentStatus === 'PAID' || o?.payment?.status === 'PAID') && (
                         <p className="mt-1 text-[10px] font-medium text-emerald-600">ชำระแล้ว</p>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       {o?.trackingNumber ? (
                         <div className="text-xs">
-                          <p className="font-mono font-medium text-slate-800">
-                            {o.trackingNumber}
-                          </p>
+                          <p className="font-mono font-medium text-slate-800">{o.trackingNumber}</p>
                           {o.carrier && <p className="text-slate-500">{o.carrier}</p>}
                         </div>
-                      ) : canShip ? (
-                        <div className="flex min-w-[180px] flex-col gap-1.5">
+                      ) : canShip && o ? (
+                        <div className="flex min-w-[200px] flex-col gap-1.5">
+                          <select
+                            value={carrierDraft[o.id] ?? ''}
+                            onChange={(e) =>
+                              setCarrierDraft((d) => ({ ...d, [o.id]: e.target.value }))
+                            }
+                            className="rounded border border-slate-300 px-2 py-1 text-xs"
+                          >
+                            <option value="">เลือกขนส่ง</option>
+                            {CARRIERS.map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </select>
                           <input
                             placeholder="เลขพัสดุ *"
                             value={trackingDraft[o.id] ?? ''}
                             onChange={(e) =>
                               setTrackingDraft((d) => ({ ...d, [o.id]: e.target.value }))
-                            }
-                            className="rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-teal-600"
-                          />
-                          <input
-                            placeholder="ขนส่ง (Flash / Kerry...)"
-                            value={carrierDraft[o.id] ?? ''}
-                            onChange={(e) =>
-                              setCarrierDraft((d) => ({ ...d, [o.id]: e.target.value }))
                             }
                             className="rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-teal-600"
                           />

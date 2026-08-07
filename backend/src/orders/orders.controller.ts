@@ -25,16 +25,10 @@ export class OrdersController {
     return this.ordersService.findMine(user.userId);
   }
 
-  @Roles('MERCHANT')
-  @Get('merchant')
-  findForMerchant(@CurrentUser() user: AuthenticatedRequestUser) {
-    return this.ordersService.findForMerchant(user.userId);
-  }
-
-
+  /** ร้านกรอกเลขพัสดุ — รองรับทั้ง PATCH และ POST (กัน proxy บล็อก PATCH) */
   @Roles('MERCHANT')
   @Patch('merchant/:orderId/ship')
-  ship(
+  shipPatch(
     @CurrentUser() user: AuthenticatedRequestUser,
     @Param('orderId') orderId: string,
     @Body() dto: ShipOrderDto,
@@ -45,6 +39,27 @@ export class OrdersController {
       dto.trackingNumber,
       dto.carrier,
     );
+  }
+
+  @Roles('MERCHANT')
+  @Post('merchant/:orderId/ship')
+  shipPost(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Param('orderId') orderId: string,
+    @Body() dto: ShipOrderDto,
+  ) {
+    return this.ordersService.shipForMerchant(
+      user.userId,
+      orderId,
+      dto.trackingNumber,
+      dto.carrier,
+    );
+  }
+
+  @Roles('MERCHANT')
+  @Get('merchant')
+  findForMerchant(@CurrentUser() user: AuthenticatedRequestUser) {
+    return this.ordersService.findForMerchant(user.userId);
   }
 
   @Roles('ADMIN', 'SUPER_ADMIN')

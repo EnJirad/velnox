@@ -250,16 +250,16 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       links: [{ href: '/admin', label: t('admin.overview'), Icon: IconChart }],
     },
     {
-      title: t('admin.merchants'),
+      title: 'ร้านค้า',
       links: [
         { href: '/admin/users', label: t('admin.users'), Icon: IconUsers },
         {
           href: '/admin/merchants',
-          label: t('admin.merchants'),
+          label: 'ร้านค้า / พ่อค้า',
           Icon: IconStore,
           badge: pendingMerchants,
         },
-        { href: '/admin/shops', label: t('admin.shops'), Icon: IconShop },
+        // หน้าร้าน (shops) รวมเข้าเมนูเดียวกับร้านค้าแล้ว — เข้าจากหน้ารายละเอียดพ่อค้าหรือ /admin/shops
         {
           href: '/admin/products',
           label: t('admin.products'),

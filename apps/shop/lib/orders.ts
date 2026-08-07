@@ -25,9 +25,29 @@ export const orderStatusTone: Record<
 
 export const paymentMethodLabel: Record<string, string> = {
   promptpay: 'พร้อมเพย์',
+  PROMPTPAY: 'พร้อมเพย์',
+  PROMPTPAY_QR: 'พร้อมเพย์ (QR)',
   card: 'บัตรเครดิต/เดบิต',
+  CARD: 'บัตรเครดิต/เดบิต',
   cod: 'เก็บเงินปลายทาง',
+  COD: 'เก็บเงินปลายทาง',
+  bank_transfer: 'โอนธนาคาร',
+  BANK_TRANSFER: 'โอนธนาคาร',
 };
+
+export function formatPaymentMethod(method?: string | null): string {
+  if (!method) return '—';
+  return paymentMethodLabel[method] ?? paymentMethodLabel[method.toLowerCase()] ?? method;
+}
+
+/** ขั้นตอนสถานะออเดอร์สำหรับ timeline */
+export const ORDER_STEPS = [
+  { key: 'PENDING', label: 'รอชำระ/รอดำเนินการ' },
+  { key: 'PROCESSING', label: 'กำลังจัดเตรียม' },
+  { key: 'SHIPPED', label: 'กำลังจัดส่ง' },
+  { key: 'DELIVERED', label: 'ส่งสำเร็จ' },
+] as const;
+
 
 export type ShippingAddressInput = {
   name: string;

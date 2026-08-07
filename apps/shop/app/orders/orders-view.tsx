@@ -9,7 +9,8 @@ import {
   fetchMyOrders,
   orderStatusLabel,
   orderStatusTone,
-  paymentMethodLabel,
+  formatPaymentMethod,
+  ORDER_STEPS,
 } from '@/lib/orders';
 import { ApiError } from '@/lib/api-client';
 import { IconBox } from '@/components/icons';
@@ -95,6 +96,38 @@ export function OrdersView() {
                   {orderStatusLabel[order.status] ?? order.status}
                 </Badge>
               </div>
+
+              {/* timeline สถานะ */}
+              {order.status !== 'CANCELLED' && (
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {ORDER_STEPS.map((step, idx) => {
+                    const statusOrder = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
+                    const cur = statusOrder.indexOf(order.status === 'CONFIRMED' ? 'PROCESSING' : order.status);
+                    const stepIdx = statusOrder.indexOf(step.key === 'PROCESSING' ? 'PROCESSING' : step.key);
+                    // map simplified
+                    const map: Record<string, number> = { PENDING: 0, CONFIRMED: 1, PROCESSING: 1, SHIPPED: 2, DELIVERED: 3 };
+                    const curN = map[order.status] ?? 0;
+                    const stepN = map[step.key] ?? idx;
+                    const done = curN >= stepN;
+                    const active = curN === stepN;
+                    return (
+                      <span
+                        key={step.key}
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          active
+                            ? 'bg-teal-700 text-white'
+                            : done
+                              ? 'bg-teal-100 text-teal-800'
+                              : 'bg-slate-100 text-slate-400'
+                        }`}
+                      >
+                        {step.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
               {(order as { trackingNumber?: string | null }).trackingNumber && (
                 <div className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   <p className="text-xs text-slate-500">เลขพัสดุ</p>
@@ -145,7 +178,7 @@ export function OrdersView() {
                   {order.payment?.method && (
                     <>
                       {' · '}
-                      {paymentMethodLabel[order.payment.method] ?? order.payment.method}
+                      {formatPaymentMethod(order.payment.method)}
                     </>
                   )}
                   {' · '}
