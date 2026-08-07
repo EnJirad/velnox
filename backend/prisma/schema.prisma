@@ -1,6 +1,6 @@
 // Velnox Prisma Schema — source of truth for models
 // Aligned with production Neon as of 2026-08-06 (commit ~234b4f7)
-// Includes: Order shipping snapshot, VelRepeat, PromptPay settings, payment slip
+// Includes: Order shipping, tracking/carrier, VelRepeat, PromptPay, payment slip
 // Reference SQL dump: backend/prisma/vel-table.sql
 //
 generator client {
@@ -311,6 +311,10 @@ model Order {
   shippingProvince    String? @map("shipping_province")
   shippingPostalCode  String? @map("shipping_postal_code")
   shippingCountry     String  @default("TH") @map("shipping_country")
+
+  /// เลขพัสดุ / ขนส่ง (Merchant ยืนยันจัดส่ง)
+  trackingNumber String? @map("tracking_number")
+  carrier        String? // Flash, Kerry, Thailand Post, J&T, SPX ฯลฯ
 
   user              User               @relation(fields: [userId], references: [id])
   items             OrderItem[]

@@ -209,6 +209,8 @@ CREATE TABLE "orders" (
   "shipping_province"     TEXT,
   "shipping_postal_code"  TEXT,
   "shipping_country"      TEXT NOT NULL DEFAULT 'TH',
+  "tracking_number"       TEXT,
+  "carrier"               TEXT,
   CONSTRAINT "orders_user_id_fkey"
     FOREIGN KEY ("user_id") REFERENCES "users"("id")
 );
@@ -466,3 +468,8 @@ ALTER TABLE "platform_settings"
 ALTER TABLE "payments"
   ADD COLUMN IF NOT EXISTS "slip_url" TEXT,
   ADD COLUMN IF NOT EXISTS "slip_uploaded_at" TIMESTAMPTZ;
+
+-- เลขพัสดุ / ขนส่ง (Merchant ยืนยันจัดส่ง → SHIPPED)
+ALTER TABLE "orders"
+  ADD COLUMN IF NOT EXISTS "tracking_number" TEXT,
+  ADD COLUMN IF NOT EXISTS "carrier" TEXT;
