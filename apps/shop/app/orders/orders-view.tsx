@@ -101,10 +101,6 @@ export function OrdersView() {
               {order.status !== 'CANCELLED' && (
                 <div className="mt-3 flex flex-wrap gap-1">
                   {ORDER_STEPS.map((step, idx) => {
-                    const statusOrder = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
-                    const cur = statusOrder.indexOf(order.status === 'CONFIRMED' ? 'PROCESSING' : order.status);
-                    const stepIdx = statusOrder.indexOf(step.key === 'PROCESSING' ? 'PROCESSING' : step.key);
-                    // map simplified
                     const map: Record<string, number> = { PENDING: 0, CONFIRMED: 1, PROCESSING: 1, SHIPPED: 2, DELIVERED: 3 };
                     const curN = map[order.status] ?? 0;
                     const stepN = map[step.key] ?? idx;

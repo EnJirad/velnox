@@ -1,74 +1,33 @@
-# Velnox — AI Handoff Document
+# Velnox — AI Handoff
 
-> อัปเดตล่าสุด: 2026-08-07 ~12:15 +07  
-> Repo: https://github.com/EnJirad/velnox.git  
-> Commit อ้างอิงโดยประมาณ: `986128e` (+ แพตช์ merchant tracking)  
-> Backend: https://velnox-api.onrender.com  
-> เป้าหมาย: MVP ซื้อ–ขาย–จัดส่งได้
+> อัปเดต: 2026-08-08 ~00:15 +07  
+> Commit อ้างอิง: `032af4e` (+ แพตช์ `ux-mega` ชุด Shop)  
+> Backend: https://velnox-api.onrender.com
 
----
-
-## สถานะฟีเจอร์
+## สถานะธุรกิจ MVP
 
 | รายการ | สถานะ |
 |--------|--------|
-| Checkout + ที่อยู่ + PromptPay QR 24 ชม. | ✅ |
-| อัปโหลดสลิป / ดาวน์โหลด QR | ✅ |
-| Center อนุมัติสลิป → **PAID + PROCESSING** + WS | ✅ (`986128e`) |
-| Merchant แจ้งจัดเตรียม + **กรอกเลขพัสดุ → SHIPPED** | ⏳ แพตช์ `merchant-tracking` |
-| Shop แสดงเลขพัสดุ | ⏳ ในแพตช์เดียวกัน |
-| CSV พัสดุ / payout 7 วัน / API เช็คพัสดุ | ⏳ ยังไม่ทำ |
+| สั่งซื้อ / PromptPay / สลิป / Center อนุมัติ | ✅ ใช้งานได้ |
+| เลขพัสดุ Merchant → ลูกค้าเห็น | ✅ ตามรายงานผู้ใช้ |
+| Shop UX มือถือ (bottom nav, ธีม, ฟิลเตอร์) | ⏳ แพตช์ `ux-mega` |
+| Merchant คลังรวม / cover / payout 7 วัน | ⏳ ยังไม่ทำ |
+| Center รายได้บริษัท / soft-delete / type-confirm | ⏳ ยังไม่ทำ |
 
----
+## ทำแล้วในแพตช์นี้
+- `MobileBottomNav`: หน้าหลัก · สินค้า · ติดตามออเดอร์ · ตะกร้า · โปรไฟล์
+- เลิก hamburger dropdown
+- ธีม Teal–Mint
+- Products filter ดีขึ้น
 
-## Flow หลังอนุมัติเงิน
+## ลำดับงานถัดไป (แนะนำ)
+1. Deploy ชุด Shop UX ทดสอบมือถือ
+2. Merchant: รวมหน้าสินค้า+คลัง + แก้สต็อกเร็ว
+3. Center: type-confirm + soft-delete สินค้า 30 วัน
+4. แท็บรายได้บริษัท + payout ร้าน 7 วัน
+5. วิเคราะห์/รายงานเชิงลึก
 
-```text
-Center อนุมัติสลิป
-  → paymentStatus=PAID, status=PROCESSING
-  → WS order:updated → Merchant เห็น「กำลังจัดเตรียม」
-
-Merchant กรอกเลขพัสดุ + ยืนยัน
-  → trackingNumber, carrier บันทึก
-  → status=SHIPPED
-  → WS order:updated → Shop + Center
-  → ลูกค้าเห็นเลขพัสดุใน「คำสั่งซื้อของฉัน」
-```
-
-### API
-
-| Method | Path |
-|--------|------|
-| PATCH | `/api/orders/merchant/:orderId/ship` `{ trackingNumber, carrier? }` |
-
-### Schema
-
-```
-Order.trackingNumber  @map("tracking_number")
-Order.carrier
-```
-
-Neon: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_number TEXT, carrier TEXT;`
-
----
-
-## Deploy / lockfile
-
-- ห้าม lockfile มี `tarball: http://35.245...`  
-- `promptpay-qr` = **^0.5.0**  
-- Upload folder **`slips`** ต้องอยู่ใน backend ที่ deploy  
-
----
-
-## งานถัดไป
-
-1. Merge/deploy **merchant-tracking** + รัน SQL tracking  
-2. ทดสอบ: อนุมัติ → ร้านเห็นแบนเนอร์ → กรอกพัสดุ → ลูกค้าเห็นเลข  
-3. CSV bulk tracking (ภายหลัง)  
-4. Payout ร้าน 7 วัน  
-
----
-
-## กฎ AI
-
-อ่าน HANDOFF · โฟกัส MVP · sync schema กับ Neon · อัปเดต HANDOFF · ไม่ใส่ secrets
+## กฎ
+- Destructive action ต้องพิมพ์ CONFIRM หรือ DELETE
+- ไม่ใช้ emoji ในเมนู admin ใช้ icon SVG
+- Sync schema กับ Neon ก่อนใช้ฟิลด์ใหม่
