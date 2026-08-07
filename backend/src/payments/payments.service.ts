@@ -57,7 +57,7 @@ export class PaymentsService {
         data: {
           method: 'PROMPTPAY_QR',
           amount: order.total,
-          status: 'PENDING',
+          status: order.payment.status === 'PAID' ? 'PAID' : 'PENDING',
         },
       });
     } else {
@@ -71,6 +71,10 @@ export class PaymentsService {
       });
     }
 
+    const payment = await this.prisma.payment.findUnique({
+      where: { orderId: order.id },
+    });
+
     return {
       orderId: order.id,
       orderNumber: order.orderNumber,
@@ -80,8 +84,58 @@ export class PaymentsService {
       bankAccountName: settings?.bankAccountName ?? null,
       bankName: settings?.bankName ?? null,
       qrDataUrl: qr.qrDataUrl,
+      slipUrl: (payment as { slipUrl?: string | null } | null)?.slipUrl ?? null,
       message:
-        'สแกน QR ด้วยแอปธนาคาร ยอดจะขึ้นอัตโนมัติ จากนั้นกดยืนยันการโอน',
+        'สแกน QR ด้วยแอปธนาคาร ยอดจะขึ้นอัตโนมัติ จากนั้นกดยืนยันการโอน แล้วอัปโหลดสลิป',
+    };
+  }
+
+  /** ลูกค้าอัปโหลดสลิปหลังโอน (เก็บ URL จาก Cloudinary) */
+  async submitSlip(orderId: string, userId: string, slipUrl: string) {
+    const url = slipUrl?.trim();
+    if (!url || !/^https?:\/\//i.test(url)) {
+      throw new BadRequestException('กรุณาแนบลิงก์รูปสลิปที่ถูกต้อง');
+    }
+
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+      include: { payment: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    if (order.paymentStatus === 'PAID') {
+      throw new BadRequestException('Order is already paid');
+    }
+
+    const data = {
+      method: order.payment?.method || 'PROMPTPAY_QR',
+      amount: order.total,
+      status: 'PENDING' as const,
+      slipUrl: url,
+      slipUploadedAt: new Date(),
+    };
+
+    if (order.payment) {
+      await this.prisma.payment.update({
+        where: { id: order.payment.id },
+        data,
+      });
+    } else {
+      await this.prisma.payment.create({
+        data: {
+          orderId: order.id,
+          ...data,
+        },
+      });
+    }
+
+    return {
+      success: true,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      slipUrl: url,
+      message: 'อัปโหลดสลิปแล้ว รอเจ้าหน้าที่ตรวจสอบ',
     };
   }
 }

@@ -1,9 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatCurrency } from '@velnox/utils';
-import { fetchPromptPayQr, type PromptPayQrResponse } from '@/lib/payments';
-import { ApiError } from '@/lib/api-client';
+import {
+  fetchPromptPayQr,
+  submitPaymentSlip,
+  type PromptPayQrResponse,
+} from '@/lib/payments';
+import { ApiError, uploadImage } from '@/lib/api-client';
 
 type Props = {
   orderId: string;
@@ -16,6 +20,9 @@ export function PromptPayQrPanel({ orderId, orderNumber, onClose, modal = false 
   const [data, setData] = useState<PromptPayQrResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [slipDone, setSlipDone] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,7 +30,10 @@ export function PromptPayQrPanel({ orderId, orderNumber, onClose, modal = false 
     setError(null);
     fetchPromptPayQr(orderId)
       .then((res) => {
-        if (!cancelled) setData(res);
+        if (!cancelled) {
+          setData(res);
+          if (res.slipUrl) setSlipDone(true);
+        }
       })
       .catch((err) => {
         if (!cancelled) {
@@ -37,6 +47,31 @@ export function PromptPayQrPanel({ orderId, orderNumber, onClose, modal = false 
       cancelled = true;
     };
   }, [orderId]);
+
+  function handleDownloadQr() {
+    if (!data?.qrDataUrl) return;
+    const a = document.createElement('a');
+    a.href = data.qrDataUrl;
+    a.download = `promptpay-${data.orderNumber || orderId}.png`;
+    a.click();
+  }
+
+  async function handleSlipSelected(file: File | undefined) {
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const uploaded = await uploadImage(file, 'slips' as 'products');
+      await submitPaymentSlip(orderId, uploaded.url);
+      setSlipDone(true);
+      setData((d) => (d ? { ...d, slipUrl: uploaded.url } : d));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'อัปโหลดสลิปไม่สำเร็จ');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
 
   const body = (
     <div className="flex flex-col items-center gap-3 text-center">
@@ -69,8 +104,40 @@ export function PromptPayQrPanel({ orderId, orderNumber, onClose, modal = false 
             </p>
           )}
           <p className="text-xs text-slate-400">PromptPay: {data.promptPayIdMasked}</p>
+
+          <div className="mt-2 flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              onClick={handleDownloadQr}
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              ดาวน์โหลด QR Code
+            </button>
+            <button
+              type="button"
+              disabled={uploading || slipDone}
+              onClick={() => fileRef.current?.click()}
+              className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
+            >
+              {uploading ? 'กำลังอัปโหลด...' : slipDone ? 'อัปโหลดสลิปแล้ว' : 'อัปโหลดสลิป'}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={(e) => void handleSlipSelected(e.target.files?.[0])}
+            />
+          </div>
+
+          {slipDone && (
+            <p className="text-sm font-medium text-emerald-600">
+              ส่งสลิปแล้ว รอเจ้าหน้าที่ตรวจสอบ
+            </p>
+          )}
+
           <p className="mt-2 max-w-sm text-xs text-amber-700">
-            หลังโอนแล้ว ออเดอร์ยังอยู่ใน「คำสั่งซื้อของฉัน」 — กด「แสดง QR」ได้อีกจนกว่าจะชำระสำเร็จ
+            โอนแล้วให้อัปโหลดสลิป — หรือกลับมาเปิด QR ได้จาก「คำสั่งซื้อของฉัน」
           </p>
         </>
       )}

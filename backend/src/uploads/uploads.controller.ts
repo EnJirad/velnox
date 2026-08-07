@@ -9,7 +9,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadsService } from './uploads.service';
 
-const ALLOWED_FOLDERS = ['products', 'avatars', 'shops'];
+const ALLOWED_FOLDERS = ['products', 'avatars', 'shops', 'slips'];
 
 @Controller('uploads')
 export class UploadsController {

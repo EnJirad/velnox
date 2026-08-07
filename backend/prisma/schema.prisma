@@ -1,6 +1,6 @@
 // Velnox Prisma Schema — source of truth for models
 // Aligned with production Neon as of 2026-08-06 (commit ~234b4f7)
-// Includes: Order shipping snapshot, VelRepeat prepaid pack + product plans
+// Includes: Order shipping snapshot, VelRepeat, PromptPay settings, payment slip
 // Reference SQL dump: backend/prisma/vel-table.sql
 //
 generator client {
@@ -342,13 +342,16 @@ model OrderItem {
 // -----------------------------
 
 model Payment {
-  id            String        @id @default(uuid())
-  orderId       String        @unique @map("order_id")
-  method        String
-  amount        Decimal       @db.Decimal(12, 2)
-  status        PaymentStatus @default(PENDING)
-  transactionId String?       @map("transaction_id")
-  paidAt        DateTime?     @map("paid_at")
+  id             String        @id @default(uuid())
+  orderId        String        @unique @map("order_id")
+  method         String
+  amount         Decimal       @db.Decimal(12, 2)
+  status         PaymentStatus @default(PENDING)
+  transactionId  String?       @map("transaction_id")
+  paidAt         DateTime?     @map("paid_at")
+  /// รูปสลิปโอนเงิน (Cloudinary URL)
+  slipUrl        String?       @map("slip_url")
+  slipUploadedAt DateTime?     @map("slip_uploaded_at")
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 

@@ -233,13 +233,15 @@ CREATE TABLE "order_items" (
 -- =========================
 
 CREATE TABLE "payments" (
-  "id"             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "order_id"       UUID NOT NULL UNIQUE,
-  "method"         TEXT NOT NULL,
-  "amount"         DECIMAL(12, 2) NOT NULL,
-  "status"         "PaymentStatus" NOT NULL DEFAULT 'PENDING',
-  "transaction_id" TEXT,
-  "paid_at"        TIMESTAMPTZ,
+  "id"               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "order_id"         UUID NOT NULL UNIQUE,
+  "method"           TEXT NOT NULL,
+  "amount"           DECIMAL(12, 2) NOT NULL,
+  "status"           "PaymentStatus" NOT NULL DEFAULT 'PENDING',
+  "transaction_id"   TEXT,
+  "paid_at"          TIMESTAMPTZ,
+  "slip_url"         TEXT,
+  "slip_uploaded_at" TIMESTAMPTZ,
   CONSTRAINT "payments_order_id_fkey"
     FOREIGN KEY ("order_id") REFERENCES "orders"("id") ON DELETE CASCADE
 );
@@ -452,3 +454,15 @@ CREATE TABLE IF NOT EXISTS "product_velrepeat_plans" (
   "created_at"         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at"         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- PromptPay / บัญชีบริษัท (idempotent)
+ALTER TABLE "platform_settings"
+  ADD COLUMN IF NOT EXISTS "prompt_pay_id" TEXT,
+  ADD COLUMN IF NOT EXISTS "bank_account_name" TEXT,
+  ADD COLUMN IF NOT EXISTS "bank_account_number" TEXT,
+  ADD COLUMN IF NOT EXISTS "bank_name" TEXT;
+
+-- สลิปโอนเงินบน payments
+ALTER TABLE "payments"
+  ADD COLUMN IF NOT EXISTS "slip_url" TEXT,
+  ADD COLUMN IF NOT EXISTS "slip_uploaded_at" TIMESTAMPTZ;
