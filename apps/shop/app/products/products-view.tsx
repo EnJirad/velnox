@@ -228,7 +228,7 @@ export function ProductsView({
                 >
                   <Link href={`/products/${p.slug || p.id}`} className="block">
                     <div className="aspect-square bg-slate-50">
-                      <ProductImage product={p} />
+                      <ProductImage src={p.imageUrl} alt={p.name} width={400} />
                     </div>
                     <div className="p-3">
                       <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium text-slate-800">
