@@ -148,13 +148,19 @@ export function ProfileView() {
     if (!addressForm.province.trim()) err.province = 'กรุณากรอกจังหวัด';
     if (!addressForm.postalCode.trim() || addressForm.postalCode.trim().length < 4)
       err.postalCode = 'กรุณากรอกรหัสไปรษณีย์';
+    if (!addressGeo) err.geo = 'กรุณาเพิ่มตำแหน่งจัดส่ง (ใช้ตำแหน่งปัจจุบัน หรือเลือกบนแผนที่)';
     return err;
   }
 
   function focusFirstError(errs: Record<string, string>) {
-    const order = ['name', 'phone', 'addressLine', 'city', 'province', 'postalCode'];
+    const order = ['name', 'phone', 'addressLine', 'city', 'province', 'postalCode', 'geo'];
     const first = order.find((k) => errs[k]);
     if (!first) return;
+    if (first === 'geo') {
+      const el = fieldRefs.current.geo;
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     const el = fieldRefs.current[first];
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -475,22 +481,33 @@ export function ProfileView() {
                     </label>
                   </div>
                   <div className="mt-3">
-                    <AddressLocationPicker
-                      value={addressGeo}
-                      onChange={setAddressGeo}
-                      onAddressHint={(hint) => {
-                        setAddressForm((f) => ({
-                          ...f,
-                          addressLine:
-                            f.addressLine.trim() ||
-                            [hint.road, hint.suburb].filter(Boolean).join(' ') ||
-                            f.addressLine,
-                          city: f.city || hint.city || '',
-                          province: f.province || hint.province || '',
-                          postalCode: f.postalCode || hint.postcode || '',
-                        }));
+                    <div
+                      ref={(el) => {
+                        fieldRefs.current.geo = el as unknown as HTMLInputElement | null;
                       }}
-                    />
+                    >
+                      <AddressLocationPicker
+                        value={addressGeo}
+                        required
+                        error={fieldErrors.geo || null}
+                        onChange={(point) => {
+                          setAddressGeo(point);
+                          if (point) setFieldErrors((er) => ({ ...er, geo: '' }));
+                        }}
+                        onAddressHint={(hint) => {
+                          setAddressForm((f) => ({
+                            ...f,
+                            addressLine:
+                              f.addressLine.trim() ||
+                              [hint.road, hint.suburb].filter(Boolean).join(' ') ||
+                              f.addressLine,
+                            city: f.city || hint.city || '',
+                            province: f.province || hint.province || '',
+                            postalCode: f.postalCode || hint.postcode || '',
+                          }));
+                        }}
+                      />
+                    </div>
                   </div>
                   <div className="mt-3 flex gap-2">
                     <button

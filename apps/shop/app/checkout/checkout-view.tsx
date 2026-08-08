@@ -152,13 +152,19 @@ export function CheckoutView() {
     if (!address.province.trim()) err.province = 'กรุณากรอกจังหวัด';
     if (!address.postal.trim() || address.postal.trim().length < 4)
       err.postal = 'กรุณากรอกรหัสไปรษณีย์';
+    if (!geo) err.geo = 'กรุณาเพิ่มตำแหน่งจัดส่ง (ใช้ตำแหน่งปัจจุบัน หรือเลือกบนแผนที่)';
     return err;
   }
 
   function focusFirstError(errs: Record<string, string>) {
-    const order = ['name', 'phone', 'line', 'province', 'postal'];
+    const order = ['name', 'phone', 'line', 'province', 'postal', 'geo'];
     const first = order.find((k) => errs[k]);
     if (!first) return;
+    if (first === 'geo') {
+      const el = fieldRefs.current.geo;
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     const el = fieldRefs.current[first];
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -596,22 +602,33 @@ export function CheckoutView() {
                     </div>
                   )}
 
-                  <AddressLocationPicker
-                    value={geo}
-                    onChange={setGeo}
-                    onAddressHint={(hint) => {
-                      setAddress((a) => ({
-                        ...a,
-                        line:
-                          a.line.trim() ||
-                          [hint.road, hint.suburb].filter(Boolean).join(' ') ||
-                          a.line,
-                        city: a.city || hint.city || '',
-                        province: a.province || hint.province || '',
-                        postal: a.postal || hint.postcode || '',
-                      }));
+                  <div
+                    ref={(el) => {
+                      fieldRefs.current.geo = el as unknown as HTMLInputElement | null;
                     }}
-                  />
+                  >
+                    <AddressLocationPicker
+                      value={geo}
+                      required
+                      error={fieldErrors.geo || null}
+                      onChange={(point) => {
+                        setGeo(point);
+                        if (point) setFieldErrors((er) => ({ ...er, geo: '' }));
+                      }}
+                      onAddressHint={(hint) => {
+                        setAddress((a) => ({
+                          ...a,
+                          line:
+                            a.line.trim() ||
+                            [hint.road, hint.suburb].filter(Boolean).join(' ') ||
+                            a.line,
+                          city: a.city || hint.city || '',
+                          province: a.province || hint.province || '',
+                          postal: a.postal || hint.postcode || '',
+                        }));
+                      }}
+                    />
+                  </div>
                 </>
               )}
 

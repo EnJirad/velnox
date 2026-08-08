@@ -23,6 +23,10 @@ type Props = {
     province?: string;
     postcode?: string;
   }) => void;
+  /** ข้อความ error เมื่อบังคับต้องมีพิกัดแต่ยังไม่ใส่ */
+  error?: string | null;
+  /** true = แสดงว่าจำเป็นต้องใส่ */
+  required?: boolean;
 };
 
 declare global {
@@ -84,7 +88,7 @@ async function reverseGeocode(lat: number, lng: number) {
  * ลูกค้าใช้ระบุตำแหน่งจัดส่ง — ไม่แสดงตัวเลข lat/lng
  * พิกัดเก็บในระบบเพื่อ Center / แอปขนส่งในอนาคต
  */
-export function AddressLocationPicker({ value, onChange, onAddressHint }: Props) {
+export function AddressLocationPicker({ value, onChange, onAddressHint, error, required }: Props) {
   const mapId = useId().replace(/:/g, '');
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<{ map: any; marker: any } | null>(null);
@@ -187,12 +191,20 @@ export function AddressLocationPicker({ value, onChange, onAddressHint }: Props)
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-teal-100 bg-teal-50/40 p-3">
+    <div
+      className={`flex flex-col gap-2 rounded-xl border p-3 ${
+        error
+          ? 'border-red-500 bg-red-50/50 ring-1 ring-red-400'
+          : 'border-teal-100 bg-teal-50/40'
+      }`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold text-teal-900">ตำแหน่งจัดส่ง</p>
-          <p className="text-[10px] text-teal-800/70">
-            ช่วยให้ส่งของแม่นขึ้น — ไม่ต้องจำพิกัด ระบบเก็บให้อัตโนมัติ
+          <p className={`text-xs font-semibold ${error ? 'text-red-800' : 'text-teal-900'}`}>
+            ตำแหน่งจัดส่ง{required ? ' *' : ''}
+          </p>
+          <p className={`text-[10px] ${error ? 'text-red-700/80' : 'text-teal-800/70'}`}>
+            กดใช้ตำแหน่งปัจจุบัน หรือปรับบนแผนที่ — จำเป็นสำหรับจัดส่ง
           </p>
         </div>
         {value && (
@@ -229,6 +241,9 @@ export function AddressLocationPicker({ value, onChange, onAddressHint }: Props)
       </div>
 
       {geoError && <p className="text-xs text-red-600">{geoError}</p>}
+      {error && !value && (
+        <p className="text-xs font-medium text-red-600">{error}</p>
+      )}
 
       {/* ลูกค้าเห็นแค่สถานะ ไม่โชว์ตัวเลข lat/lng */}
       {value && (
