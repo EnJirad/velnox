@@ -1,28 +1,67 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { formatCurrency } from '@velnox/utils';
 import { useCartStore } from '@/stores/cart-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAuthContext } from '@/components/providers/auth-provider';
 import { checkoutFromClientCart } from '@/lib/orders';
-import { ApiError } from '@/lib/api-client';
+import { ApiError, apiClient } from '@/lib/api-client';
 import { IconBox } from '@/components/icons';
 import { PromptPayQrPanel } from '@/components/promptpay-qr-panel';
+import {
+  AddressLocationPicker,
+  type GeoPoint,
+  withGeoInAddressLine,
+  parseGeoFromAddressLine,
+} from '@/components/address-location-picker';
 
 const STEPS = ['ที่อยู่จัดส่ง', 'วิธีการชำระเงิน', 'ยืนยันคำสั่งซื้อ'];
 
+type SavedAddress = {
+  id: string;
+  name: string;
+  phone: string;
+  addressLine: string;
+  city: string;
+  province: string;
+  postalCode: string;
+  country: string;
+  isDefault: boolean;
+};
+
+type AddressForm = {
+  name: string;
+  phone: string;
+  line: string;
+  city: string;
+  province: string;
+  postal: string;
+};
+
+const emptyAddress: AddressForm = {
+  name: '',
+  phone: '',
+  line: '',
+  city: '',
+  province: '',
+  postal: '',
+};
+
 export function CheckoutView() {
-  const router = useRouter();
   const { isInitializing } = useAuthContext();
   const user = useAuthStore((s) => s.user);
   const items = useCartStore((s) => s.items);
   const clear = useCartStore((s) => s.clear);
   const [step, setStep] = useState(0);
   const [payment, setPayment] = useState<'card' | 'promptpay' | 'cod'>('promptpay');
-  const [address, setAddress] = useState({ name: '', phone: '', line: '', province: '', postal: '' });
+  const [address, setAddress] = useState<AddressForm>(emptyAddress);
+  const [geo, setGeo] = useState<GeoPoint | null>(null);
+  const [savedList, setSavedList] = useState<SavedAddress[]>([]);
+  const [selectedId, setSelectedId] = useState<string | 'new' | null>(null);
+  const [addrLoading, setAddrLoading] = useState(true);
+  const [saveForNext, setSaveForNext] = useState(true);
   const [placed, setPlaced] = useState<{
     id: string;
     orderNumber: string;
@@ -34,6 +73,137 @@ export function CheckoutView() {
   const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const shipping = subtotal >= 990 || subtotal === 0 ? 0 : 40;
   const total = subtotal + shipping;
+
+  const applySaved = useCallback((row: SavedAddress) => {
+    setSelectedId(row.id);
+    setAddress({
+      name: row.name,
+      phone: row.phone,
+      line: row.addressLine.replace(/\s*\|\s*GPS:[-\d.]+,[-\d.]+\s*$/i, '').trim(),
+      city: row.city || '',
+      province: row.province,
+      postal: row.postalCode,
+    });
+    setGeo(parseGeoFromAddressLine(row.addressLine));
+  }, []);
+
+  // โหลดที่อยู่ที่บันทึกไว้ + เติมชื่อจากโปรไฟล์
+  useEffect(() => {
+    if (!user) {
+      setAddrLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setAddrLoading(true);
+      try {
+        const [list, profile] = await Promise.all([
+          apiClient.get<SavedAddress[]>('/users/addresses').catch(() => [] as SavedAddress[]),
+          apiClient
+            .get<{ name: string; phone: string | null }>('/users/profile')
+            .catch(() => null),
+        ]);
+        if (cancelled) return;
+        const rows = Array.isArray(list) ? list : [];
+        setSavedList(rows);
+        const def = rows.find((a) => a.isDefault) ?? rows[0];
+        if (def) {
+          applySaved(def);
+        } else {
+          setSelectedId('new');
+          setAddress((a) => ({
+            ...a,
+            name: a.name || profile?.name || user.name || '',
+            phone: a.phone || profile?.phone || '',
+          }));
+        }
+      } finally {
+        if (!cancelled) setAddrLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, applySaved]);
+
+  function startNewAddress() {
+    setSelectedId('new');
+    setAddress({
+      name: user?.name ?? '',
+      phone: '',
+      line: '',
+      city: '',
+      province: '',
+      postal: '',
+    });
+    setGeo(null);
+  }
+
+  function validateAddress(): string | null {
+    if (!address.name.trim()) return 'กรุณากรอกชื่อผู้รับ';
+    if (!address.phone.trim() || address.phone.trim().length < 8) return 'กรุณากรอกเบอร์โทรให้ถูกต้อง';
+    if (!address.line.trim()) return 'กรุณากรอกที่อยู่';
+    if (!address.province.trim()) return 'กรุณากรอกจังหวัด';
+    if (!address.postal.trim() || address.postal.trim().length < 4) return 'กรุณากรอกรหัสไปรษณีย์';
+    return null;
+  }
+
+  async function handlePlaceOrder() {
+    const v = validateAddress();
+    if (v) {
+      setError(v);
+      setStep(0);
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      const addressLine = withGeoInAddressLine(address.line, geo);
+      const order = await checkoutFromClientCart(items, payment, {
+        name: address.name,
+        phone: address.phone,
+        addressLine,
+        province: address.province,
+        postalCode: address.postal,
+        country: 'TH',
+      });
+
+      // บันทึกที่อยู่ใหม่ไว้ใช้ครั้งหน้า (ถ้าเลือก)
+      if (saveForNext && selectedId === 'new') {
+        try {
+          await apiClient.post('/users/addresses', {
+            name: address.name.trim(),
+            phone: address.phone.trim(),
+            addressLine,
+            city: address.city.trim() || address.province.trim(),
+            province: address.province.trim(),
+            postalCode: address.postal.trim(),
+            country: 'TH',
+            isDefault: savedList.length === 0,
+          });
+        } catch {
+          /* ไม่บล็อกการสั่งซื้อ */
+        }
+      }
+
+      clear();
+      setPlaced({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        payment,
+      });
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'สั่งซื้อไม่สำเร็จ กรุณาลองใหม่',
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   if (isInitializing) {
     return (
@@ -70,82 +240,36 @@ export function CheckoutView() {
       return (
         <div className="mx-auto max-w-lg px-4 py-10">
           <div className="mb-6 text-center">
-            <h1 className="text-xl font-semibold text-slate-900">สั่งซื้อสำเร็จ — ชำระเงินด้วยพร้อมเพย์</h1>
+            <h1 className="text-xl font-semibold text-slate-900">สั่งซื้อสำเร็จแล้ว!</h1>
             <p className="mt-1 text-sm text-slate-500">
               เลขที่คำสั่งซื้อ{' '}
-              <span className="font-semibold text-teal-700">#{placed.orderNumber}</span>
+              <span className="font-mono font-semibold text-teal-700">#{placed.orderNumber}</span>
             </p>
           </div>
           <PromptPayQrPanel orderId={placed.id} orderNumber={placed.orderNumber} />
-          <div className="mt-6 flex flex-col items-center gap-2">
-            <button
-              type="button"
-              onClick={() => router.push('/orders')}
-              className="rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
-            >
-              ไปที่คำสั่งซื้อของฉัน
-            </button>
-            <p className="text-xs text-slate-400">
-              ปิดหน้านี้ได้ — กลับมาเปิด QR ได้จากหน้าคำสั่งซื้อ
-            </p>
+          <div className="mt-6 text-center">
+            <Link href="/orders" className="text-sm font-medium text-teal-700 hover:underline">
+              ดูคำสั่งซื้อของฉัน
+            </Link>
           </div>
         </div>
       );
     }
-
     return (
-      <div className="mx-auto flex max-w-xl flex-col items-center gap-3 px-4 py-24 text-center">
-        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-          <IconBox size={32} />
-        </span>
+      <div className="mx-auto max-w-xl px-4 py-24 text-center">
         <h1 className="text-xl font-semibold text-slate-900">สั่งซื้อสำเร็จแล้ว!</h1>
-        <p className="text-sm text-slate-500">
-          เลขที่คำสั่งซื้อของคุณคือ{' '}
-          <span className="font-semibold text-teal-700">#{placed.orderNumber}</span>
+        <p className="mt-2 text-sm text-slate-500">
+          เลขที่คำสั่งซื้อ{' '}
+          <span className="font-mono font-semibold text-teal-700">#{placed.orderNumber}</span>
         </p>
-        {placed.payment === 'cod' && (
-          <p className="text-sm text-slate-600">ชำระเงินปลายทางเมื่อได้รับสินค้า</p>
-        )}
-        <button
-          type="button"
-          onClick={() => router.push('/orders')}
-          className="mt-3 rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
+        <Link
+          href="/orders"
+          className="mt-6 inline-block rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
         >
-          ดูคำสั่งซื้อของฉัน
-        </button>
+          ดูคำสั่งซื้อ
+        </Link>
       </div>
     );
-  }
-
-  async function handlePlaceOrder() {
-    setError(null);
-    setSubmitting(true);
-    try {
-      const order = await checkoutFromClientCart(items, payment, {
-        name: address.name,
-        phone: address.phone,
-        addressLine: address.line,
-        province: address.province,
-        postalCode: address.postal,
-        country: 'TH',
-      });
-      clear();
-      setPlaced({
-        id: order.id,
-        orderNumber: order.orderNumber,
-        payment,
-      });
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : 'สั่งซื้อไม่สำเร็จ กรุณาลองใหม่',
-      );
-    } finally {
-      setSubmitting(false);
-    }
   }
 
   return (
@@ -180,80 +304,218 @@ export function CheckoutView() {
         <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-        <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="rounded-xl border border-slate-200 bg-white p-5">
           {step === 0 && (
-            <div className="relative z-10 flex flex-col gap-4">
-              <h2 className="text-sm font-semibold text-slate-900">ที่อยู่สำหรับจัดส่ง</h2>
-              <p className="text-xs text-slate-500">กรอกข้อมูลผู้รับและที่อยู่เพื่อจัดส่งสินค้า</p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <input
-                  type="text"
-                  name="shipping_name"
-                  autoComplete="name"
-                  placeholder="ชื่อ-นามสกุล"
-                  value={address.name}
-                  onChange={(e) => setAddress((a) => ({ ...a, name: e.target.value }))}
-                  className="relative z-10 rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
-                />
-                <input
-                  type="tel"
-                  name="shipping_phone"
-                  autoComplete="tel"
-                  inputMode="tel"
-                  placeholder="เบอร์โทรศัพท์"
-                  value={address.phone}
-                  onChange={(e) => setAddress((a) => ({ ...a, phone: e.target.value }))}
-                  className="relative z-10 rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
-                />
-              </div>
-              <input
-                type="text"
-                name="shipping_address"
-                autoComplete="street-address"
-                placeholder="ที่อยู่ (บ้านเลขที่ ถนน แขวง/ตำบล)"
-                value={address.line}
-                onChange={(e) => setAddress((a) => ({ ...a, line: e.target.value }))}
-                className="relative z-10 rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
-              />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <input
-                  type="text"
-                  name="shipping_province"
-                  autoComplete="address-level1"
-                  placeholder="จังหวัด"
-                  value={address.province}
-                  onChange={(e) => setAddress((a) => ({ ...a, province: e.target.value }))}
-                  className="relative z-10 rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
-                />
-                <input
-                  type="text"
-                  name="shipping_postal"
-                  autoComplete="postal-code"
-                  inputMode="numeric"
-                  placeholder="รหัสไปรษณีย์"
-                  value={address.postal}
-                  onChange={(e) => setAddress((a) => ({ ...a, postal: e.target.value }))}
-                  className="relative z-10 rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
-                />
-              </div>
+            <div className="flex flex-col gap-4">
+              <h2 className="text-sm font-semibold text-slate-900">ที่อยู่จัดส่ง</h2>
+
+              {addrLoading ? (
+                <p className="text-sm text-slate-400">กำลังโหลดที่อยู่ที่บันทึกไว้...</p>
+              ) : (
+                <>
+                  {savedList.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <p className="text-xs font-medium text-slate-500">เลือกจากที่อยู่ที่บันทึกไว้</p>
+                      {savedList.map((row) => {
+                        const active = selectedId === row.id;
+                        return (
+                          <button
+                            key={row.id}
+                            type="button"
+                            onClick={() => applySaved(row)}
+                            className={`rounded-xl border p-3 text-left text-sm transition ${
+                              active
+                                ? 'border-teal-600 bg-teal-50 ring-1 ring-teal-600'
+                                : 'border-slate-200 hover:border-teal-200'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="font-semibold text-slate-900">
+                                  {row.name}{' '}
+                                  {row.isDefault && (
+                                    <span className="ml-1 rounded-full bg-teal-100 px-1.5 py-0.5 text-[10px] font-medium text-teal-800">
+                                      ค่าเริ่มต้น
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-xs text-slate-500">{row.phone}</p>
+                                <p className="mt-1 text-xs text-slate-600">
+                                  {row.addressLine.replace(/\s*\|\s*GPS:[-\d.]+,[-\d.]+\s*$/i, '')}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {row.province} {row.postalCode}
+                                </p>
+                              </div>
+                              {active && (
+                                <span className="text-xs font-semibold text-teal-700">ใช้ที่อยู่นี้</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={startNewAddress}
+                        className={`rounded-xl border border-dashed p-3 text-left text-sm ${
+                          selectedId === 'new'
+                            ? 'border-teal-600 bg-teal-50 text-teal-900'
+                            : 'border-slate-300 text-slate-600 hover:border-teal-300'
+                        }`}
+                      >
+                        + ใช้ที่อยู่ใหม่
+                      </button>
+                    </div>
+                  )}
+
+                  {(selectedId === 'new' || savedList.length === 0) && (
+                    <div className="flex flex-col gap-3">
+                      {savedList.length === 0 && (
+                        <p className="text-xs text-slate-500">
+                          ยังไม่มีที่อยู่บันทึกไว้ — กรอกด้านล่าง (หรือเพิ่มในโปรไฟล์)
+                        </p>
+                      )}
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <input
+                          type="text"
+                          autoComplete="name"
+                          placeholder="ชื่อผู้รับ *"
+                          value={address.name}
+                          onChange={(e) => setAddress((a) => ({ ...a, name: e.target.value }))}
+                          className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
+                        />
+                        <input
+                          type="tel"
+                          autoComplete="tel"
+                          placeholder="เบอร์โทรศัพท์ *"
+                          value={address.phone}
+                          onChange={(e) => setAddress((a) => ({ ...a, phone: e.target.value }))}
+                          className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        autoComplete="street-address"
+                        placeholder="ที่อยู่ (บ้านเลขที่ ถนน แขวง/ตำบล) *"
+                        value={address.line}
+                        onChange={(e) => setAddress((a) => ({ ...a, line: e.target.value }))}
+                        className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
+                      />
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <input
+                          type="text"
+                          placeholder="อำเภอ/เขต"
+                          value={address.city}
+                          onChange={(e) => setAddress((a) => ({ ...a, city: e.target.value }))}
+                          className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-teal-600"
+                        />
+                        <input
+                          type="text"
+                          autoComplete="address-level1"
+                          placeholder="จังหวัด *"
+                          value={address.province}
+                          onChange={(e) => setAddress((a) => ({ ...a, province: e.target.value }))}
+                          className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-teal-600"
+                        />
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="postal-code"
+                          placeholder="รหัสไปรษณีย์ *"
+                          value={address.postal}
+                          onChange={(e) => setAddress((a) => ({ ...a, postal: e.target.value }))}
+                          className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-teal-600"
+                        />
+                      </div>
+                      <label className="flex items-center gap-2 text-xs text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={saveForNext}
+                          onChange={(e) => setSaveForNext(e.target.checked)}
+                        />
+                        บันทึกที่อยู่นี้ไว้ใช้ครั้งหน้า
+                      </label>
+                    </div>
+                  )}
+
+                  {/* แก้ไขฟอร์มได้แม้เลือกที่อยู่เดิม */}
+                  {selectedId && selectedId !== 'new' && (
+                    <div className="flex flex-col gap-3 border-t border-slate-100 pt-3">
+                      <p className="text-xs font-medium text-slate-500">ปรับรายละเอียดก่อนสั่ง (ถ้าต้องการ)</p>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <input
+                          type="text"
+                          value={address.name}
+                          onChange={(e) => setAddress((a) => ({ ...a, name: e.target.value }))}
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
+                          placeholder="ชื่อผู้รับ"
+                        />
+                        <input
+                          type="tel"
+                          value={address.phone}
+                          onChange={(e) => setAddress((a) => ({ ...a, phone: e.target.value }))}
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
+                          placeholder="เบอร์โทร"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={address.line}
+                        onChange={(e) => setAddress((a) => ({ ...a, line: e.target.value }))}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
+                        placeholder="ที่อยู่"
+                      />
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <input
+                          type="text"
+                          value={address.province}
+                          onChange={(e) => setAddress((a) => ({ ...a, province: e.target.value }))}
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
+                          placeholder="จังหวัด"
+                        />
+                        <input
+                          type="text"
+                          value={address.postal}
+                          onChange={(e) => setAddress((a) => ({ ...a, postal: e.target.value }))}
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
+                          placeholder="รหัสไปรษณีย์"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <AddressLocationPicker
+                    value={geo}
+                    onChange={setGeo}
+                    onAddressHint={(hint) => {
+                      setAddress((a) => ({
+                        ...a,
+                        line:
+                          a.line.trim() ||
+                          [hint.road, hint.suburb].filter(Boolean).join(' ') ||
+                          a.line,
+                        city: a.city || hint.city || '',
+                        province: a.province || hint.province || '',
+                        postal: a.postal || hint.postcode || '',
+                      }));
+                    }}
+                  />
+                </>
+              )}
+
               <button
                 type="button"
                 onClick={() => {
-                  if (
-                    !address.name.trim() ||
-                    !address.phone.trim() ||
-                    !address.line.trim() ||
-                    !address.province.trim() ||
-                    !address.postal.trim()
-                  ) {
-                    setError('กรุณากรอกที่อยู่จัดส่งให้ครบถ้วน');
+                  const v = validateAddress();
+                  if (v) {
+                    setError(v);
                     return;
                   }
                   setError(null);
                   setStep(1);
                 }}
-                className="mt-2 w-fit rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
+                className="mt-1 w-fit rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
               >
                 ถัดไป
               </button>
@@ -308,11 +570,21 @@ export function CheckoutView() {
             <div className="flex flex-col gap-4">
               <h2 className="text-sm font-semibold text-slate-900">ตรวจสอบคำสั่งซื้อ</h2>
               <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
-                <p className="font-medium text-slate-800">{address.name || 'ผู้รับสินค้า'}</p>
-                <p>{address.phone}</p>
-                <p>{[address.line, address.province, address.postal].filter(Boolean).join(' ')}</p>
+                <p className="font-medium text-slate-800">ที่อยู่จัดส่ง</p>
+                <p>
+                  {address.name} · {address.phone}
+                </p>
+                <p>{address.line}</p>
+                <p>
+                  {address.province} {address.postal}
+                </p>
+                {geo && (
+                  <p className="mt-1 font-mono text-[11px] text-teal-700">
+                    พิกัด {geo.lat.toFixed(5)}, {geo.lng.toFixed(5)}
+                  </p>
+                )}
               </div>
-              <ul className="flex flex-col gap-2 text-sm text-slate-600">
+              <ul className="flex flex-col gap-2 text-sm text-slate-700">
                 {items.map((i) => (
                   <li key={i.productId} className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-2">
@@ -343,7 +615,7 @@ export function CheckoutView() {
                 </button>
                 <button
                   type="button"
-                  onClick={handlePlaceOrder}
+                  onClick={() => void handlePlaceOrder()}
                   disabled={submitting}
                   className="rounded-md bg-orange-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-60"
                 >

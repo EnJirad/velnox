@@ -6,6 +6,11 @@ import { apiClient } from '@/lib/api-client';
 import { logout as logoutRequest } from '@/lib/auth';
 import { useAuthStore } from '@/stores/auth-store';
 import { AvatarUpload } from '@/components/avatar-upload';
+import {
+  AddressLocationPicker,
+  type GeoPoint,
+  withGeoInAddressLine,
+} from '@/components/address-location-picker';
 
 const TABS = [
   { key: 'info', label: 'ข้อมูลส่วนตัว' },
@@ -61,6 +66,7 @@ export function ProfileView() {
   const [addressForm, setAddressForm] = useState(emptyForm);
   const [addressSaving, setAddressSaving] = useState(false);
   const [addressError, setAddressError] = useState<string | null>(null);
+  const [addressGeo, setAddressGeo] = useState<GeoPoint | null>(null);
 
   const loadAddresses = useCallback(async () => {
     try {
@@ -150,7 +156,7 @@ export function ProfileView() {
       await apiClient.post('/users/addresses', {
         name: addressForm.name.trim(),
         phone: addressForm.phone.trim(),
-        addressLine: addressForm.addressLine.trim(),
+        addressLine: withGeoInAddressLine(addressForm.addressLine.trim(), addressGeo),
         city: addressForm.city.trim(),
         province: addressForm.province.trim(),
         postalCode: addressForm.postalCode.trim(),
@@ -285,6 +291,7 @@ export function ProfileView() {
                       phone: profile.phone ?? '',
                       isDefault: addresses.length === 0,
                     });
+                    setAddressGeo(null);
                   }}
                   className="rounded-md bg-teal-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-teal-800"
                 >
@@ -356,6 +363,24 @@ export function ProfileView() {
                       />
                       ตั้งเป็นที่อยู่หลัก
                     </label>
+                  </div>
+                  <div className="mt-3">
+                    <AddressLocationPicker
+                      value={addressGeo}
+                      onChange={setAddressGeo}
+                      onAddressHint={(hint) => {
+                        setAddressForm((f) => ({
+                          ...f,
+                          addressLine:
+                            f.addressLine.trim() ||
+                            [hint.road, hint.suburb].filter(Boolean).join(' ') ||
+                            f.addressLine,
+                          city: f.city || hint.city || '',
+                          province: f.province || hint.province || '',
+                          postalCode: f.postalCode || hint.postcode || '',
+                        }));
+                      }}
+                    />
                   </div>
                   <div className="mt-3 flex gap-2">
                     <button
