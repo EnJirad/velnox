@@ -4,6 +4,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 import { CreateAddressDto } from './dto/create-address.dto';
+import { UpdateAddressDto } from './dto/update-address.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { AuthenticatedRequestUser } from '../auth/types/authenticated-request-user';
@@ -36,6 +37,15 @@ export class UsersController {
     @Body() dto: CreateAddressDto,
   ) {
     return this.usersService.createAddress(user.userId, dto);
+  }
+
+  @Patch('addresses/:id')
+  updateAddress(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateAddressDto,
+  ) {
+    return this.usersService.updateAddress(user.userId, id, dto);
   }
 
   @Delete('addresses/:id')

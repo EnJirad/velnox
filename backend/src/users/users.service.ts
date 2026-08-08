@@ -194,6 +194,54 @@ export class UsersService {
     });
   }
 
+
+  async updateAddress(
+    userId: string,
+    addressId: string,
+    data: {
+      name?: string;
+      phone?: string;
+      addressLine?: string;
+      city?: string;
+      province?: string;
+      postalCode?: string;
+      country?: string;
+      isDefault?: boolean;
+    },
+  ) {
+    const existing = await this.prisma.address.findFirst({
+      where: { id: addressId, userId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Address not found');
+    }
+    if (data.isDefault) {
+      await this.prisma.address.updateMany({
+        where: { userId },
+        data: { isDefault: false },
+      });
+    }
+    return this.prisma.address.update({
+      where: { id: addressId },
+      data: {
+        ...(data.name !== undefined ? { name: data.name.trim() } : {}),
+        ...(data.phone !== undefined ? { phone: data.phone.trim() } : {}),
+        ...(data.addressLine !== undefined
+          ? { addressLine: data.addressLine.trim() }
+          : {}),
+        ...(data.city !== undefined ? { city: data.city.trim() } : {}),
+        ...(data.province !== undefined ? { province: data.province.trim() } : {}),
+        ...(data.postalCode !== undefined
+          ? { postalCode: data.postalCode.trim() }
+          : {}),
+        ...(data.country !== undefined
+          ? { country: data.country.trim() || 'TH' }
+          : {}),
+        ...(data.isDefault !== undefined ? { isDefault: !!data.isDefault } : {}),
+      },
+    });
+  }
+
   async deleteAddress(userId: string, addressId: string) {
     const existing = await this.prisma.address.findFirst({
       where: { id: addressId, userId },

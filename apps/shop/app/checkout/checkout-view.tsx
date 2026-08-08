@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { formatCurrency } from '@velnox/utils';
 import { useCartStore } from '@/stores/cart-store';
@@ -69,6 +69,8 @@ export function CheckoutView() {
   } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const fieldRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const shipping = subtotal >= 990 || subtotal === 0 ? 0 : 40;
@@ -76,6 +78,7 @@ export function CheckoutView() {
 
   const applySaved = useCallback((row: SavedAddress) => {
     setSelectedId(row.id);
+    setFieldErrors({});
     setAddress({
       name: row.name,
       phone: row.phone,
@@ -139,13 +142,42 @@ export function CheckoutView() {
     setGeo(null);
   }
 
+  function validateAddressFields(): Record<string, string> {
+    const err: Record<string, string> = {};
+    if (!address.name.trim()) err.name = 'กรุณากรอกชื่อผู้รับ';
+    if (!address.phone.trim() || address.phone.trim().length < 8)
+      err.phone = 'กรุณากรอกเบอร์โทรให้ถูกต้อง';
+    if (!address.line.trim()) err.line = 'กรุณากรอกที่อยู่';
+    if (!address.province.trim()) err.province = 'กรุณากรอกจังหวัด';
+    if (!address.postal.trim() || address.postal.trim().length < 4)
+      err.postal = 'กรุณากรอกรหัสไปรษณีย์';
+    return err;
+  }
+
+  function focusFirstError(errs: Record<string, string>) {
+    const order = ['name', 'phone', 'line', 'province', 'postal'];
+    const first = order.find((k) => errs[k]);
+    if (!first) return;
+    const el = fieldRefs.current[first];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.focus();
+    }
+  }
+
+  function inputClass(key: string) {
+    const base = 'rounded-lg border px-3 py-2.5 text-sm outline-none focus:ring-1 ';
+    return fieldErrors[key]
+      ? base + 'border-red-500 focus:border-red-500 focus:ring-red-400'
+      : base + 'border-slate-300 focus:border-teal-600 focus:ring-teal-600';
+  }
+
   function validateAddress(): string | null {
-    if (!address.name.trim()) return 'กรุณากรอกชื่อผู้รับ';
-    if (!address.phone.trim() || address.phone.trim().length < 8) return 'กรุณากรอกเบอร์โทรให้ถูกต้อง';
-    if (!address.line.trim()) return 'กรุณากรอกที่อยู่';
-    if (!address.province.trim()) return 'กรุณากรอกจังหวัด';
-    if (!address.postal.trim() || address.postal.trim().length < 4) return 'กรุณากรอกรหัสไปรษณีย์';
-    return null;
+    const errs = validateAddressFields();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length === 0) return null;
+    setTimeout(() => focusFirstError(errs), 50);
+    return 'กรุณากรอกช่องที่มีกรอบสีแดงให้ครบ';
   }
 
   async function handlePlaceOrder() {
@@ -377,31 +409,52 @@ export function CheckoutView() {
                         </p>
                       )}
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <input
-                          type="text"
-                          autoComplete="name"
-                          placeholder="ชื่อผู้รับ *"
-                          value={address.name}
-                          onChange={(e) => setAddress((a) => ({ ...a, name: e.target.value }))}
-                          className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
-                        />
-                        <input
-                          type="tel"
-                          autoComplete="tel"
-                          placeholder="เบอร์โทรศัพท์ *"
-                          value={address.phone}
-                          onChange={(e) => setAddress((a) => ({ ...a, phone: e.target.value }))}
-                          className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
-                        />
+                        <div className="flex flex-col gap-0.5">
+                          <input
+                            ref={(el) => { fieldRefs.current.name = el; }}
+                            type="text"
+                            autoComplete="name"
+                            placeholder="ชื่อผู้รับ *"
+                            value={address.name}
+                            onChange={(e) => {
+                              setAddress((a) => ({ ...a, name: e.target.value }));
+                              setFieldErrors((er) => ({ ...er, name: '' }));
+                            }}
+                            className={inputClass('name')}
+                          />
+                          {fieldErrors.name && <p className="text-[11px] text-red-600">{fieldErrors.name}</p>}
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <input
+                            ref={(el) => { fieldRefs.current.phone = el; }}
+                            type="tel"
+                            autoComplete="tel"
+                            placeholder="เบอร์โทรศัพท์ *"
+                            value={address.phone}
+                            onChange={(e) => {
+                              setAddress((a) => ({ ...a, phone: e.target.value }));
+                              setFieldErrors((er) => ({ ...er, phone: '' }));
+                            }}
+                            className={inputClass('phone')}
+                          />
+                          {fieldErrors.phone && <p className="text-[11px] text-red-600">{fieldErrors.phone}</p>}
+                        </div>
                       </div>
-                      <input
-                        type="text"
-                        autoComplete="street-address"
-                        placeholder="ที่อยู่ (บ้านเลขที่ ถนน แขวง/ตำบล) *"
-                        value={address.line}
-                        onChange={(e) => setAddress((a) => ({ ...a, line: e.target.value }))}
-                        className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
-                      />
+                      <div className="flex flex-col gap-0.5">
+                        <input
+                          ref={(el) => { fieldRefs.current.line = el; }}
+                          type="text"
+                          autoComplete="street-address"
+                          placeholder="ที่อยู่ (บ้านเลขที่ ถนน แขวง/ตำบล) *"
+                          value={address.line}
+                          onChange={(e) => {
+                            setAddress((a) => ({ ...a, line: e.target.value }));
+                            setFieldErrors((er) => ({ ...er, line: '' }));
+                          }}
+                          className={inputClass('line')}
+                        />
+                        {fieldErrors.line && <p className="text-[11px] text-red-600">{fieldErrors.line}</p>}
+                      </div>
                       <div className="grid gap-3 sm:grid-cols-3">
                         <input
                           type="text"
@@ -410,23 +463,41 @@ export function CheckoutView() {
                           onChange={(e) => setAddress((a) => ({ ...a, city: e.target.value }))}
                           className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-teal-600"
                         />
-                        <input
-                          type="text"
-                          autoComplete="address-level1"
-                          placeholder="จังหวัด *"
-                          value={address.province}
-                          onChange={(e) => setAddress((a) => ({ ...a, province: e.target.value }))}
-                          className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-teal-600"
-                        />
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          autoComplete="postal-code"
-                          placeholder="รหัสไปรษณีย์ *"
-                          value={address.postal}
-                          onChange={(e) => setAddress((a) => ({ ...a, postal: e.target.value }))}
-                          className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-teal-600"
-                        />
+                        <div className="flex flex-col gap-0.5">
+                          <input
+                            ref={(el) => { fieldRefs.current.province = el; }}
+                            type="text"
+                            autoComplete="address-level1"
+                            placeholder="จังหวัด *"
+                            value={address.province}
+                            onChange={(e) => {
+                              setAddress((a) => ({ ...a, province: e.target.value }));
+                              setFieldErrors((er) => ({ ...er, province: '' }));
+                            }}
+                            className={inputClass('province')}
+                          />
+                          {fieldErrors.province && (
+                            <p className="text-[11px] text-red-600">{fieldErrors.province}</p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <input
+                            ref={(el) => { fieldRefs.current.postal = el; }}
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="postal-code"
+                            placeholder="รหัสไปรษณีย์ *"
+                            value={address.postal}
+                            onChange={(e) => {
+                              setAddress((a) => ({ ...a, postal: e.target.value }));
+                              setFieldErrors((er) => ({ ...er, postal: '' }));
+                            }}
+                            className={inputClass('postal')}
+                          />
+                          {fieldErrors.postal && (
+                            <p className="text-[11px] text-red-600">{fieldErrors.postal}</p>
+                          )}
+                        </div>
                       </div>
                       <label className="flex items-center gap-2 text-xs text-slate-600">
                         <input
@@ -444,43 +515,82 @@ export function CheckoutView() {
                     <div className="flex flex-col gap-3 border-t border-slate-100 pt-3">
                       <p className="text-xs font-medium text-slate-500">ปรับรายละเอียดก่อนสั่ง (ถ้าต้องการ)</p>
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <input
-                          type="text"
-                          value={address.name}
-                          onChange={(e) => setAddress((a) => ({ ...a, name: e.target.value }))}
-                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
-                          placeholder="ชื่อผู้รับ"
-                        />
-                        <input
-                          type="tel"
-                          value={address.phone}
-                          onChange={(e) => setAddress((a) => ({ ...a, phone: e.target.value }))}
-                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
-                          placeholder="เบอร์โทร"
-                        />
+                        <div className="flex flex-col gap-0.5">
+                          <input
+                            ref={(el) => { fieldRefs.current.name = el; }}
+                            type="text"
+                            value={address.name}
+                            onChange={(e) => {
+                              setAddress((a) => ({ ...a, name: e.target.value }));
+                              setFieldErrors((er) => ({ ...er, name: '' }));
+                            }}
+                            className={inputClass('name')}
+                            placeholder="ชื่อผู้รับ"
+                          />
+                          {fieldErrors.name && <p className="text-[11px] text-red-600">{fieldErrors.name}</p>}
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <input
+                            ref={(el) => { fieldRefs.current.phone = el; }}
+                            type="tel"
+                            value={address.phone}
+                            onChange={(e) => {
+                              setAddress((a) => ({ ...a, phone: e.target.value }));
+                              setFieldErrors((er) => ({ ...er, phone: '' }));
+                            }}
+                            className={inputClass('phone')}
+                            placeholder="เบอร์โทร"
+                          />
+                          {fieldErrors.phone && <p className="text-[11px] text-red-600">{fieldErrors.phone}</p>}
+                        </div>
                       </div>
-                      <input
-                        type="text"
-                        value={address.line}
-                        onChange={(e) => setAddress((a) => ({ ...a, line: e.target.value }))}
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
-                        placeholder="ที่อยู่"
-                      />
+                      <div className="flex flex-col gap-0.5">
+                        <input
+                          ref={(el) => { fieldRefs.current.line = el; }}
+                          type="text"
+                          value={address.line}
+                          onChange={(e) => {
+                            setAddress((a) => ({ ...a, line: e.target.value }));
+                            setFieldErrors((er) => ({ ...er, line: '' }));
+                          }}
+                          className={inputClass('line')}
+                          placeholder="ที่อยู่"
+                        />
+                        {fieldErrors.line && <p className="text-[11px] text-red-600">{fieldErrors.line}</p>}
+                      </div>
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <input
-                          type="text"
-                          value={address.province}
-                          onChange={(e) => setAddress((a) => ({ ...a, province: e.target.value }))}
-                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
-                          placeholder="จังหวัด"
-                        />
-                        <input
-                          type="text"
-                          value={address.postal}
-                          onChange={(e) => setAddress((a) => ({ ...a, postal: e.target.value }))}
-                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600"
-                          placeholder="รหัสไปรษณีย์"
-                        />
+                        <div className="flex flex-col gap-0.5">
+                          <input
+                            ref={(el) => { fieldRefs.current.province = el; }}
+                            type="text"
+                            value={address.province}
+                            onChange={(e) => {
+                              setAddress((a) => ({ ...a, province: e.target.value }));
+                              setFieldErrors((er) => ({ ...er, province: '' }));
+                            }}
+                            className={inputClass('province')}
+                            placeholder="จังหวัด"
+                          />
+                          {fieldErrors.province && (
+                            <p className="text-[11px] text-red-600">{fieldErrors.province}</p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <input
+                            ref={(el) => { fieldRefs.current.postal = el; }}
+                            type="text"
+                            value={address.postal}
+                            onChange={(e) => {
+                              setAddress((a) => ({ ...a, postal: e.target.value }));
+                              setFieldErrors((er) => ({ ...er, postal: '' }));
+                            }}
+                            className={inputClass('postal')}
+                            placeholder="รหัสไปรษณีย์"
+                          />
+                          {fieldErrors.postal && (
+                            <p className="text-[11px] text-red-600">{fieldErrors.postal}</p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}

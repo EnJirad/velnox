@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { logout as logoutRequest } from '@/lib/auth';
@@ -67,6 +67,9 @@ export function ProfileView() {
   const [addressSaving, setAddressSaving] = useState(false);
   const [addressError, setAddressError] = useState<string | null>(null);
   const [addressGeo, setAddressGeo] = useState<GeoPoint | null>(null);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const fieldRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const loadAddresses = useCallback(async () => {
     try {
@@ -138,22 +141,74 @@ export function ProfileView() {
     router.push('/');
   }
 
+  function validateAddressFields(): Record<string, string> {
+    const err: Record<string, string> = {};
+    if (!addressForm.name.trim()) err.name = 'กรุณากรอกชื่อผู้รับ';
+    if (!addressForm.phone.trim() || addressForm.phone.trim().length < 8)
+      err.phone = 'กรุณากรอกเบอร์โทรให้ถูกต้อง';
+    if (!addressForm.addressLine.trim()) err.addressLine = 'กรุณากรอกที่อยู่';
+    if (!addressForm.city.trim()) err.city = 'กรุณากรอกอำเภอ/เขต';
+    if (!addressForm.province.trim()) err.province = 'กรุณากรอกจังหวัด';
+    if (!addressForm.postalCode.trim() || addressForm.postalCode.trim().length < 4)
+      err.postalCode = 'กรุณากรอกรหัสไปรษณีย์';
+    return err;
+  }
+
+  function focusFirstError(errs: Record<string, string>) {
+    const order = ['name', 'phone', 'addressLine', 'city', 'province', 'postalCode'];
+    const first = order.find((k) => errs[k]);
+    if (!first) return;
+    const el = fieldRefs.current[first];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.focus();
+    }
+  }
+
+  function inputClass(key: string) {
+    const base =
+      'rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-1 ';
+    return fieldErrors[key]
+      ? base + 'border-red-500 focus:border-red-500 focus:ring-red-400'
+      : base + 'border-slate-300 focus:border-teal-600 focus:ring-teal-600';
+  }
+
+  function startEditAddress(a: AddressRow) {
+    setEditingAddressId(a.id);
+    setShowAddressForm(true);
+    setAddressError(null);
+    setFieldErrors({});
+    setAddressForm({
+      name: a.name,
+      phone: a.phone,
+      addressLine: a.addressLine.replace(/\s*\|\s*GPS:[-\d.]+,[-\d.]+\s*$/i, '').trim(),
+      city: a.city,
+      province: a.province,
+      postalCode: a.postalCode,
+      country: a.country || 'TH',
+      isDefault: a.isDefault,
+    });
+    const m = a.addressLine.match(/\|\s*GPS:([-\d.]+),([-\d.]+)\s*$/i);
+    if (m) {
+      setAddressGeo({ lat: Number(m[1]), lng: Number(m[2]) });
+    } else {
+      setAddressGeo(null);
+    }
+  }
+
   async function handleSaveAddress() {
     setAddressError(null);
-    if (
-      !addressForm.name.trim() ||
-      !addressForm.phone.trim() ||
-      !addressForm.addressLine.trim() ||
-      !addressForm.city.trim() ||
-      !addressForm.province.trim() ||
-      !addressForm.postalCode.trim()
-    ) {
-      setAddressError('กรุณากรอกข้อมูลที่อยู่ให้ครบ');
+    const errs = validateAddressFields();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setAddressError('กรุณากรอกช่องที่มีกรอบสีแดงให้ครบ');
+      // รอ state paint แล้วโฟกัส
+      setTimeout(() => focusFirstError(errs), 50);
       return;
     }
     setAddressSaving(true);
     try {
-      await apiClient.post('/users/addresses', {
+      const payload = {
         name: addressForm.name.trim(),
         phone: addressForm.phone.trim(),
         addressLine: withGeoInAddressLine(addressForm.addressLine.trim(), addressGeo),
@@ -162,9 +217,17 @@ export function ProfileView() {
         postalCode: addressForm.postalCode.trim(),
         country: addressForm.country.trim() || 'TH',
         isDefault: addressForm.isDefault,
-      });
+      };
+      if (editingAddressId) {
+        await apiClient.patch(`/users/addresses/${editingAddressId}`, payload);
+      } else {
+        await apiClient.post('/users/addresses', payload);
+      }
       setShowAddressForm(false);
+      setEditingAddressId(null);
       setAddressForm(emptyForm);
+      setAddressGeo(null);
+      setFieldErrors({});
       await loadAddresses();
     } catch (err) {
       setAddressError(err instanceof Error ? err.message : 'บันทึกที่อยู่ไม่สำเร็จ');
@@ -283,19 +346,28 @@ export function ProfileView() {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowAddressForm((v) => !v);
+                    const next = !showAddressForm;
+                    setShowAddressForm(next);
                     setAddressError(null);
-                    setAddressForm({
-                      ...emptyForm,
-                      name: profile.name,
-                      phone: profile.phone ?? '',
-                      isDefault: addresses.length === 0,
-                    });
-                    setAddressGeo(null);
+                    setFieldErrors({});
+                    setEditingAddressId(null);
+                    if (next) {
+                      setAddressForm({
+                        ...emptyForm,
+                        name: profile.name,
+                        phone: profile.phone ?? '',
+                        isDefault: addresses.length === 0,
+                      });
+                      setAddressGeo(null);
+                    }
                   }}
                   className="rounded-md bg-teal-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-teal-800"
                 >
-                  {showAddressForm ? 'ปิดฟอร์ม' : '+ เพิ่มที่อยู่ใหม่'}
+                  {showAddressForm && !editingAddressId
+                    ? 'ปิดฟอร์ม'
+                    : showAddressForm && editingAddressId
+                      ? 'ยกเลิกแก้ไข'
+                      : '+ เพิ่มที่อยู่ใหม่'}
                 </button>
               </div>
 
@@ -305,54 +377,100 @@ export function ProfileView() {
 
               {showAddressForm && (
                 <div className="rounded-lg border border-teal-100 bg-teal-50/40 p-4">
-                  <p className="mb-3 text-sm font-medium text-slate-800">กรอกที่อยู่จัดส่ง</p>
+                  <p className="mb-3 text-sm font-medium text-slate-800">
+                    {editingAddressId ? 'แก้ไขที่อยู่จัดส่ง' : 'กรอกที่อยู่จัดส่งใหม่'}
+                  </p>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <input
-                      type="text"
-                      placeholder="ชื่อ-นามสกุลผู้รับ *"
-                      value={addressForm.name}
-                      onChange={(e) => setAddressForm((f) => ({ ...f, name: e.target.value }))}
-                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600"
-                    />
-                    <input
-                      type="tel"
-                      placeholder="เบอร์โทร *"
-                      value={addressForm.phone}
-                      onChange={(e) => setAddressForm((f) => ({ ...f, phone: e.target.value }))}
-                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600"
-                    />
-                    <input
-                      type="text"
-                      placeholder="ที่อยู่ (บ้านเลขที่ ถนน) *"
-                      value={addressForm.addressLine}
-                      onChange={(e) =>
-                        setAddressForm((f) => ({ ...f, addressLine: e.target.value }))
-                      }
-                      className="sm:col-span-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600"
-                    />
-                    <input
-                      type="text"
-                      placeholder="เขต/อำเภอ หรือ ตำบล *"
-                      value={addressForm.city}
-                      onChange={(e) => setAddressForm((f) => ({ ...f, city: e.target.value }))}
-                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600"
-                    />
-                    <input
-                      type="text"
-                      placeholder="จังหวัด *"
-                      value={addressForm.province}
-                      onChange={(e) => setAddressForm((f) => ({ ...f, province: e.target.value }))}
-                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600"
-                    />
-                    <input
-                      type="text"
-                      placeholder="รหัสไปรษณีย์ *"
-                      value={addressForm.postalCode}
-                      onChange={(e) =>
-                        setAddressForm((f) => ({ ...f, postalCode: e.target.value }))
-                      }
-                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600"
-                    />
+                    <div className="flex flex-col gap-0.5">
+                      <input
+                        ref={(el) => { fieldRefs.current.name = el; }}
+                        type="text"
+                        placeholder="ชื่อ-นามสกุลผู้รับ *"
+                        value={addressForm.name}
+                        onChange={(e) => {
+                          setAddressForm((f) => ({ ...f, name: e.target.value }));
+                          setFieldErrors((er) => ({ ...er, name: '' }));
+                        }}
+                        className={inputClass('name')}
+                      />
+                      {fieldErrors.name && <p className="text-[11px] text-red-600">{fieldErrors.name}</p>}
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <input
+                        ref={(el) => { fieldRefs.current.phone = el; }}
+                        type="tel"
+                        placeholder="เบอร์โทร *"
+                        value={addressForm.phone}
+                        onChange={(e) => {
+                          setAddressForm((f) => ({ ...f, phone: e.target.value }));
+                          setFieldErrors((er) => ({ ...er, phone: '' }));
+                        }}
+                        className={inputClass('phone')}
+                      />
+                      {fieldErrors.phone && <p className="text-[11px] text-red-600">{fieldErrors.phone}</p>}
+                    </div>
+                    <div className="flex flex-col gap-0.5 sm:col-span-2">
+                      <input
+                        ref={(el) => { fieldRefs.current.addressLine = el; }}
+                        type="text"
+                        placeholder="ที่อยู่ (บ้านเลขที่ ถนน) *"
+                        value={addressForm.addressLine}
+                        onChange={(e) => {
+                          setAddressForm((f) => ({ ...f, addressLine: e.target.value }));
+                          setFieldErrors((er) => ({ ...er, addressLine: '' }));
+                        }}
+                        className={inputClass('addressLine')}
+                      />
+                      {fieldErrors.addressLine && (
+                        <p className="text-[11px] text-red-600">{fieldErrors.addressLine}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <input
+                        ref={(el) => { fieldRefs.current.city = el; }}
+                        type="text"
+                        placeholder="เขต/อำเภอ หรือ ตำบล *"
+                        value={addressForm.city}
+                        onChange={(e) => {
+                          setAddressForm((f) => ({ ...f, city: e.target.value }));
+                          setFieldErrors((er) => ({ ...er, city: '' }));
+                        }}
+                        className={inputClass('city')}
+                      />
+                      {fieldErrors.city && <p className="text-[11px] text-red-600">{fieldErrors.city}</p>}
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <input
+                        ref={(el) => { fieldRefs.current.province = el; }}
+                        type="text"
+                        placeholder="จังหวัด *"
+                        value={addressForm.province}
+                        onChange={(e) => {
+                          setAddressForm((f) => ({ ...f, province: e.target.value }));
+                          setFieldErrors((er) => ({ ...er, province: '' }));
+                        }}
+                        className={inputClass('province')}
+                      />
+                      {fieldErrors.province && (
+                        <p className="text-[11px] text-red-600">{fieldErrors.province}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <input
+                        ref={(el) => { fieldRefs.current.postalCode = el; }}
+                        type="text"
+                        placeholder="รหัสไปรษณีย์ *"
+                        value={addressForm.postalCode}
+                        onChange={(e) => {
+                          setAddressForm((f) => ({ ...f, postalCode: e.target.value }));
+                          setFieldErrors((er) => ({ ...er, postalCode: '' }));
+                        }}
+                        className={inputClass('postalCode')}
+                      />
+                      {fieldErrors.postalCode && (
+                        <p className="text-[11px] text-red-600">{fieldErrors.postalCode}</p>
+                      )}
+                    </div>
                     <label className="flex items-center gap-2 text-sm text-slate-700">
                       <input
                         type="checkbox"
@@ -389,11 +507,16 @@ export function ProfileView() {
                       disabled={addressSaving}
                       className="rounded-md bg-teal-700 px-5 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
                     >
-                      {addressSaving ? 'กำลังบันทึก...' : 'บันทึกที่อยู่'}
+                      {addressSaving ? 'กำลังบันทึก...' : editingAddressId ? 'บันทึกการแก้ไข' : 'บันทึกที่อยู่'}
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowAddressForm(false)}
+                      onClick={() => {
+                        setShowAddressForm(false);
+                        setEditingAddressId(null);
+                        setFieldErrors({});
+                        setAddressError(null);
+                      }}
                       className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
                     >
                       ยกเลิก
@@ -426,13 +549,22 @@ export function ProfileView() {
                             {a.addressLine} {a.city} {a.province} {a.postalCode}
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteAddress(a.id)}
-                          className="shrink-0 text-xs text-red-600 hover:underline"
-                        >
-                          ลบ
-                        </button>
+                        <div className="flex shrink-0 flex-col gap-1">
+                          <button
+                            type="button"
+                            onClick={() => startEditAddress(a)}
+                            className="text-xs font-medium text-teal-700 hover:underline"
+                          >
+                            แก้ไข
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAddress(a.id)}
+                            className="text-xs text-red-600 hover:underline"
+                          >
+                            ลบ
+                          </button>
+                        </div>
                       </div>
                     </li>
                   ))}
