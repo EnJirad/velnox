@@ -66,7 +66,7 @@ export function NotificationBell() {
             orderNumber: o.orderNumber,
             title: 'อัปเดตคำสั่งซื้อ',
             body,
-            createdAt: o.updatedAt ?? o.createdAt,
+            createdAt: o.createdAt,
           });
         }
       }
