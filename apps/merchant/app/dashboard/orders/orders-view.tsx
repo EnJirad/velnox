@@ -311,34 +311,44 @@ export function OrdersView() {
                           {o.carrier && <p className="text-slate-500">{o.carrier}</p>}
                         </div>
                       ) : canShip && o ? (
-                        <div className="flex min-w-[200px] flex-col gap-1.5">
-                          <select
-                            value={carrierDraft[o.id] ?? ''}
-                            onChange={(e) =>
-                              setCarrierDraft((d) => ({ ...d, [o.id]: e.target.value }))
-                            }
-                            className="rounded border border-slate-300 px-2 py-1 text-xs"
-                          >
-                            <option value="">เลือกขนส่ง</option>
-                            {CARRIERS.map((c) => (
-                              <option key={c} value={c}>
-                                {c}
-                              </option>
-                            ))}
-                          </select>
+                        <div className="flex min-w-[220px] flex-col gap-2">
+                          <div className="flex flex-wrap gap-1">
+                            {CARRIERS.map((c) => {
+                              const active = (carrierDraft[o.id] ?? '') === c;
+                              return (
+                                <button
+                                  key={c}
+                                  type="button"
+                                  onClick={() =>
+                                    setCarrierDraft((d) => ({
+                                      ...d,
+                                      [o.id]: active ? '' : c,
+                                    }))
+                                  }
+                                  className={`rounded-full px-2.5 py-1 text-[10px] font-medium transition ${
+                                    active
+                                      ? 'bg-teal-700 text-white'
+                                      : 'border border-slate-200 bg-white text-slate-600 hover:border-teal-300'
+                                  }`}
+                                >
+                                  {c}
+                                </button>
+                              );
+                            })}
+                          </div>
                           <input
                             placeholder="เลขพัสดุ *"
                             value={trackingDraft[o.id] ?? ''}
                             onChange={(e) =>
                               setTrackingDraft((d) => ({ ...d, [o.id]: e.target.value }))
                             }
-                            className="rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-teal-600"
+                            className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20"
                           />
                           <button
                             type="button"
                             disabled={busyId === o.id}
                             onClick={() => void confirmShip(o.id)}
-                            className="rounded bg-teal-700 px-2 py-1 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+                            className="rounded-lg bg-teal-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
                           >
                             {busyId === o.id ? 'กำลังบันทึก...' : 'ยืนยันจัดส่ง'}
                           </button>

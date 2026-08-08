@@ -265,6 +265,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     {
       title: t('admin.analytics'),
       links: [
+        { href: '/admin/revenue', label: 'รายได้บริษัท', Icon: IconAnalytics },
         { href: '/admin/reports', label: t('admin.reports'), Icon: IconReport },
         { href: '/admin/analytics', label: t('admin.analytics'), Icon: IconAnalytics },
         { href: '/admin/settings', label: t('admin.settings'), Icon: IconSettings },

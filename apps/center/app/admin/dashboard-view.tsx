@@ -93,7 +93,7 @@ export default function DashboardView() {
           <p className="mt-1 text-xs text-slate-400">กำลังดำเนินการอยู่</p>
         </Card>
         <Card>
-          <p className="text-xs text-slate-500">🔁 VelRepeat ที่ใช้งาน</p>
+          <p className="text-xs text-slate-500">VelRepeat ที่ใช้งาน</p>
           <p className="mt-1 text-2xl font-bold text-slate-900">{stats.velrepeatActive.toLocaleString('th-TH')}</p>
           <p className="mt-1 text-xs text-slate-400">พักไว้ {stats.velrepeatPaused} รายการ</p>
         </Card>

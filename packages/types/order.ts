@@ -52,5 +52,8 @@ export interface Order {
   shippingCountry?: string | null;
   items?: OrderItem[];
   payment?: OrderPayment | null;
+  /** เลขพัสดุ / ขนส่ง (Merchant ยืนยันจัดส่ง) */
+  trackingNumber?: string | null;
+  carrier?: string | null;
   createdAt: string;
 }

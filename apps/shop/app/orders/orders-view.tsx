@@ -124,13 +124,13 @@ export function OrdersView() {
                 </div>
               )}
 
-              {(order as { trackingNumber?: string | null }).trackingNumber && (
+              {order.trackingNumber && (
                 <div className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   <p className="text-xs text-slate-500">เลขพัสดุ</p>
                   <p className="font-mono font-semibold">
-                    {(order as { trackingNumber?: string }).trackingNumber}
-                    {(order as { carrier?: string | null }).carrier
-                      ? ` · ${(order as { carrier?: string }).carrier}`
+                    {order.trackingNumber}
+                    {order.carrier
+                      ? ` · ${order.carrier}`
                       : ''}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">

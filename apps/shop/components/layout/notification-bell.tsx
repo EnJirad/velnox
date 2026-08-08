@@ -48,7 +48,7 @@ export function NotificationBell() {
       const notis: Noti[] = [];
 
       for (const o of orders) {
-        const key = `${o.status}|${o.paymentStatus}|${(o as { trackingNumber?: string }).trackingNumber ?? ''}`;
+        const key = `${o.status}|${o.paymentStatus}|${o.trackingNumber ?? ''}`;
         nextSnap[o.id] = key;
         const old = prev[o.id];
         if (old && old !== key) {
@@ -57,8 +57,8 @@ export function NotificationBell() {
           if (o.paymentStatus === 'PAID' && !old.includes('PAID')) {
             body = `ชำระเงินสำเร็จ — #${o.orderNumber}`;
           }
-          if ((o as { trackingNumber?: string }).trackingNumber) {
-            body = `มีเลขพัสดุแล้ว — #${o.orderNumber}: ${(o as { trackingNumber?: string }).trackingNumber}`;
+          if (o.trackingNumber) {
+            body = `มีเลขพัสดุแล้ว — #${o.orderNumber}: ${o.trackingNumber}`;
           }
           notis.push({
             id: `${o.id}-${key}`,
