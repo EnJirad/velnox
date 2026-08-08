@@ -219,3 +219,18 @@ backend/
   src/orders/   src/payments/   src/uploads/
 packages/types/order.ts   # ต้อง sync กับ Prisma เมื่อแตะ Order
 ```
+
+## พิกัดจัดส่ง (Geo) — สถาปัตยกรรม
+
+**Visibility**
+| ฝั่ง | เห็นอะไร |
+|------|----------|
+| VelShop ลูกค้า | ปุ่มตั้งตำแหน่ง / แผนที่ — **ไม่โชว์ตัวเลข lat,lng** แก้ที่อยู่+พิกัดได้เสมอ |
+| VelMerchant | ชื่อ โทร ที่อยู่ จังหวัด รหัสไปรษณีย์ — **ไม่มีพิกัด** (API strip) |
+| VelCenter | ที่อยู่เต็ม + **พิกัด + ลิงก์ Maps** |
+| แอปขนส่ง (อนาคต) | อ่านพิกัดจาก Order |
+
+**ปัจจุบัน:** encode ใน `shippingAddressLine` / `addressLine` เป็น `... \| GPS:lat,lng`  
+**อนาคต (ไม่พังของเก่า):** เพิ่ม `shippingLat` `shippingLng` บน Order + `lat` `lng` บน Address แล้ว migrate ข้อมูลด้วย `parseGeoFromText` จาก `@velnox/utils/geo`
+
+Helpers: `encodeGeoInText` · `parseGeoFromText` · `stripGeoFromText` · `mapsOpenUrl`

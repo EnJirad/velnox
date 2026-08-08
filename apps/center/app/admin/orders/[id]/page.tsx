@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { formatCurrency, formatDate } from '@velnox/utils';
+import { formatCurrency, formatDate, parseGeoFromText, stripGeoFromText, mapsOpenUrl, osmOpenUrl } from '@velnox/utils';
 import { Badge } from '@velnox/ui';
 import { apiClient } from '@/lib/api-client';
 import {
@@ -22,6 +22,14 @@ type AdminOrder = {
   shippingFee: number | string;
   total: number | string;
   createdAt: string;
+  shippingName?: string | null;
+  shippingPhone?: string | null;
+  shippingAddressLine?: string | null;
+  shippingProvince?: string | null;
+  shippingPostalCode?: string | null;
+  shippingCountry?: string | null;
+  trackingNumber?: string | null;
+  carrier?: string | null;
   user?: { id: string; name: string; email: string; phone?: string | null };
   payment?: {
     method: string;
@@ -213,6 +221,65 @@ export default function AdminOrderDetailPage() {
           </button>
         ))}
       </div>
+
+      {/* ที่อยู่จัดส่ง + พิกัด (Center / อนาคตแอปขนส่งเท่านั้น) */}
+      {(order.shippingName || order.shippingAddressLine) && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-sm font-semibold text-slate-900">ที่อยู่จัดส่ง</p>
+          <div className="mt-2 text-sm text-slate-700">
+            {order.shippingName && <p className="font-medium">{order.shippingName}</p>}
+            {order.shippingPhone && <p className="text-slate-500">{order.shippingPhone}</p>}
+            {order.shippingAddressLine && (
+              <p className="mt-1">{stripGeoFromText(order.shippingAddressLine)}</p>
+            )}
+            <p className="text-slate-500">
+              {[order.shippingProvince, order.shippingPostalCode, order.shippingCountry]
+                .filter(Boolean)
+                .join(' ')}
+            </p>
+            {order.trackingNumber && (
+              <p className="mt-2 font-mono text-xs text-slate-600">
+                พัสดุ: {order.trackingNumber}
+                {order.carrier ? ` · ${order.carrier}` : ''}
+              </p>
+            )}
+          </div>
+          {(() => {
+            const geo = parseGeoFromText(order.shippingAddressLine);
+            if (!geo) {
+              return (
+                <p className="mt-3 text-xs text-amber-700">ยังไม่มีพิกัดจากลูกค้า</p>
+              );
+            }
+            return (
+              <div className="mt-3 rounded-lg border border-teal-100 bg-teal-50/50 p-3">
+                <p className="text-xs font-semibold text-teal-900">พิกัดจัดส่ง (เฉพาะ Center)</p>
+                <p className="mt-1 font-mono text-xs text-slate-700">
+                  {geo.lat.toFixed(6)}, {geo.lng.toFixed(6)}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <a
+                    href={mapsOpenUrl(geo)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-md bg-teal-700 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-teal-800"
+                  >
+                    เปิด Google Maps
+                  </a>
+                  <a
+                    href={osmOpenUrl(geo)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-md border border-teal-200 bg-white px-2.5 py-1 text-[11px] font-medium text-teal-800 hover:bg-teal-50"
+                  >
+                    OpenStreetMap
+                  </a>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-4">

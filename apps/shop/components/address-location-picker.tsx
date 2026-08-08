@@ -1,13 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import {
+  type GeoPoint,
+  encodeGeoInText,
+  parseGeoFromText,
+  stripGeoFromText,
+} from '@velnox/utils';
 
-export type GeoPoint = { lat: number; lng: number };
+export type { GeoPoint };
+export { encodeGeoInText as withGeoInAddressLine, parseGeoFromText as parseGeoFromAddressLine, stripGeoFromText };
 
 type Props = {
   value: GeoPoint | null;
   onChange: (point: GeoPoint | null) => void;
-  /** เมื่อ reverse geocode ได้ข้อความที่อยู่ */
+  /** เมื่อ reverse geocode ได้ข้อความที่อยู่ — ไม่โชว์พิกัดดิบให้ลูกค้า */
   onAddressHint?: (hint: {
     displayName?: string;
     road?: string;
@@ -19,7 +26,6 @@ type Props = {
 };
 
 declare global {
-  // Leaflet โหลดจาก CDN — ไม่ผูก dependency ใน package.json
   interface Window {
     L?: any;
   }
@@ -54,9 +60,7 @@ function loadLeaflet(): Promise<void> {
 async function reverseGeocode(lat: number, lng: number) {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=th`;
-    const res = await fetch(url, {
-      headers: { Accept: 'application/json' },
-    });
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
     if (!res.ok) return null;
     const data = (await res.json()) as {
       display_name?: string;
@@ -76,6 +80,10 @@ async function reverseGeocode(lat: number, lng: number) {
   }
 }
 
+/**
+ * ลูกค้าใช้ระบุตำแหน่งจัดส่ง — ไม่แสดงตัวเลข lat/lng
+ * พิกัดเก็บในระบบเพื่อ Center / แอปขนส่งในอนาคต
+ */
 export function AddressLocationPicker({ value, onChange, onAddressHint }: Props) {
   const mapId = useId().replace(/:/g, '');
   const mapRef = useRef<HTMLDivElement>(null);
@@ -83,7 +91,7 @@ export function AddressLocationPicker({ value, onChange, onAddressHint }: Props)
   const [mapReady, setMapReady] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geoBusy, setGeoBusy] = useState(false);
-  const [showMap, setShowMap] = useState(!!value);
+  const [showMap, setShowMap] = useState(false);
 
   const applyPoint = useCallback(
     async (lat: number, lng: number, withReverse = true) => {
@@ -95,7 +103,6 @@ export function AddressLocationPicker({ value, onChange, onAddressHint }: Props)
     [onChange, onAddressHint],
   );
 
-  // init / update map
   useEffect(() => {
     if (!showMap || !mapRef.current) return;
     let cancelled = false;
@@ -109,7 +116,7 @@ export function AddressLocationPicker({ value, onChange, onAddressHint }: Props)
         if (!mapInstance.current) {
           const center: [number, number] = value
             ? [value.lat, value.lng]
-            : [13.7563, 100.5018]; // Bangkok
+            : [13.7563, 100.5018];
           const map = L.map(mapRef.current).setView(center, value ? 16 : 12);
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap',
@@ -138,7 +145,6 @@ export function AddressLocationPicker({ value, onChange, onAddressHint }: Props)
     };
   }, [showMap, applyPoint, value]);
 
-  // sync marker when value changes externally
   useEffect(() => {
     if (!mapInstance.current || !value) return;
     const { map, marker } = mapInstance.current;
@@ -146,7 +152,6 @@ export function AddressLocationPicker({ value, onChange, onAddressHint }: Props)
     map.setView([value.lat, value.lng], Math.max(map.getZoom(), 15));
   }, [value?.lat, value?.lng]);
 
-  // cleanup map on unmount
   useEffect(() => {
     return () => {
       if (mapInstance.current) {
@@ -166,9 +171,7 @@ export function AddressLocationPicker({ value, onChange, onAddressHint }: Props)
     setShowMap(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        void applyPoint(lat, lng, true);
+        void applyPoint(pos.coords.latitude, pos.coords.longitude, true);
         setGeoBusy(false);
       },
       (err) => {
@@ -186,14 +189,19 @@ export function AddressLocationPicker({ value, onChange, onAddressHint }: Props)
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-teal-100 bg-teal-50/40 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-teal-900">พิกัดจัดส่ง (ช่วยให้ส่งของแม่นขึ้น)</p>
+        <div>
+          <p className="text-xs font-semibold text-teal-900">ตำแหน่งจัดส่ง</p>
+          <p className="text-[10px] text-teal-800/70">
+            ช่วยให้ส่งของแม่นขึ้น — ไม่ต้องจำพิกัด ระบบเก็บให้อัตโนมัติ
+          </p>
+        </div>
         {value && (
           <button
             type="button"
             onClick={() => onChange(null)}
             className="text-[11px] text-slate-500 hover:text-red-600"
           >
-            ล้างพิกัด
+            ล้างตำแหน่ง
           </button>
         )}
       </div>
@@ -209,22 +217,27 @@ export function AddressLocationPicker({ value, onChange, onAddressHint }: Props)
             <circle cx="12" cy="12" r="3" />
             <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
           </svg>
-          {geoBusy ? 'กำลังหาตำแหน่ง...' : 'ใช้พิกัดปัจจุบัน'}
+          {geoBusy ? 'กำลังหาตำแหน่ง...' : 'ใช้ตำแหน่งปัจจุบัน'}
         </button>
         <button
           type="button"
           onClick={() => setShowMap((v) => !v)}
           className="rounded-lg border border-teal-200 bg-white px-3 py-2 text-xs font-medium text-teal-800 hover:bg-teal-50"
         >
-          {showMap ? 'ซ่อนแผนที่' : 'เลือกบนแผนที่'}
+          {showMap ? 'ซ่อนแผนที่' : 'ปรับบนแผนที่'}
         </button>
       </div>
 
       {geoError && <p className="text-xs text-red-600">{geoError}</p>}
 
+      {/* ลูกค้าเห็นแค่สถานะ ไม่โชว์ตัวเลข lat/lng */}
       {value && (
-        <p className="font-mono text-[11px] text-slate-600">
-          lat {value.lat.toFixed(6)}, lng {value.lng.toFixed(6)}
+        <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-[10px]">
+            ✓
+          </span>
+          บันทึกตำแหน่งจัดส่งแล้ว
+          {showMap ? ' — ลากหมุดเพื่อปรับ' : ''}
         </p>
       )}
 
@@ -237,28 +250,10 @@ export function AddressLocationPicker({ value, onChange, onAddressHint }: Props)
             style={{ zIndex: 0 }}
           />
           <p className="bg-white px-2 py-1.5 text-[10px] text-slate-500">
-            {mapReady
-              ? 'ลากหมุดหรือแตะแผนที่เพื่อปรับตำแหน่ง'
-              : 'กำลังโหลดแผนที่...'}
+            {mapReady ? 'ลากหมุดหรือแตะแผนที่เพื่อปรับตำแหน่ง' : 'กำลังโหลดแผนที่...'}
           </p>
         </div>
       )}
     </div>
   );
-}
-
-/** แนบพิกัดเข้า addressLine สำหรับส่งให้ backend (ยังไม่มีคอลัมน์ lat/lng) */
-export function withGeoInAddressLine(line: string, geo: GeoPoint | null): string {
-  const base = line.replace(/\s*\|\s*GPS:[-\d.]+,[-\d.]+\s*$/i, '').trim();
-  if (!geo) return base;
-  return `${base} | GPS:${geo.lat.toFixed(6)},${geo.lng.toFixed(6)}`;
-}
-
-export function parseGeoFromAddressLine(line: string): GeoPoint | null {
-  const m = line.match(/\|\s*GPS:([-\d.]+),([-\d.]+)\s*$/i);
-  if (!m) return null;
-  const lat = Number(m[1]);
-  const lng = Number(m[2]);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return { lat, lng };
 }

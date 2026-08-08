@@ -36,6 +36,10 @@ type Row = ApiOrderItem & {
     trackingNumber?: string | null;
     carrier?: string | null;
     shippingName?: string | null;
+    shippingPhone?: string | null;
+    shippingAddressLine?: string | null;
+    shippingProvince?: string | null;
+    shippingPostalCode?: string | null;
     payment?: { status?: string; method?: string } | null;
   };
 };
@@ -286,7 +290,18 @@ export function OrdersView() {
                     </td>
                     <td className="px-4 py-3">
                       {o?.shippingName && (
-                        <p className="text-xs font-medium text-slate-700">{o.shippingName}</p>
+                        <div className="text-xs text-slate-700">
+                          <p className="font-medium">{o.shippingName}</p>
+                          {o.shippingPhone && <p className="text-slate-500">{o.shippingPhone}</p>}
+                          {o.shippingAddressLine && (
+                            <p className="mt-0.5 text-slate-600">{o.shippingAddressLine}</p>
+                          )}
+                          {(o.shippingProvince || o.shippingPostalCode) && (
+                            <p className="text-slate-500">
+                              {[o.shippingProvince, o.shippingPostalCode].filter(Boolean).join(' ')}
+                            </p>
+                          )}
+                        </div>
                       )}
                       <p className="text-slate-700">{item.product?.name ?? item.productId}</p>
                       <p className="text-xs text-slate-400">× {item.quantity}</p>

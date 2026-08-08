@@ -34,7 +34,27 @@ const ORDER_LIST_SELECT = {
   trackingNumber: true,
   carrier: true,
   shippingName: true,
+  shippingPhone: true,
+  shippingAddressLine: true,
+  shippingProvince: true,
+  shippingPostalCode: true,
+  shippingCountry: true,
 } as const;
+
+/** ตัด | GPS:lat,lng ออก — ร้านไม่ควรเห็นพิกัด (Center / แอปขนส่งเท่านั้น) */
+function stripGeoFromAddressLine(line: string | null | undefined): string | null {
+  if (line == null) return line ?? null;
+  return line.replace(/\s*\|\s*GPS:[-\d.]+,[-\d.]+\s*$/i, '').trim();
+}
+
+function sanitizeOrderShippingForMerchant<T extends { shippingAddressLine?: string | null }>(
+  order: T,
+): T {
+  return {
+    ...order,
+    shippingAddressLine: stripGeoFromAddressLine(order.shippingAddressLine),
+  };
+}
 
 
 function normalizePaymentMethod(method?: string): string {
@@ -233,7 +253,7 @@ export class OrdersService {
     if (!merchant) {
       throw new ForbiddenException('You do not have a merchant account');
     }
-    return this.prisma.orderItem.findMany({
+    const rows = await this.prisma.orderItem.findMany({
       where: { merchantId: merchant.id },
       select: {
         id: true,
@@ -254,6 +274,13 @@ export class OrdersService {
       },
       orderBy: { order: { createdAt: 'desc' } },
     });
+    // Merchant: ที่อยู่ข้อความเท่านั้น — ไม่ส่งพิกัด
+    return rows.map((row) => ({
+      ...row,
+      order: row.order
+        ? sanitizeOrderShippingForMerchant(row.order)
+        : row.order,
+    }));
   }
 
   findAll() {
