@@ -405,7 +405,7 @@ export const en: Dict = {
     dialogTitle: "Add address",
     dialogEditTitle: "Edit address",
     dialogDesc:
-      "Drag the map until the spot sits under the center pin, then press “Confirm this location” — a default address needs GPS coordinates",
+      "Pick a location on the map (drag the pin or tap the map) — a default address needs GPS coordinates",
     labelName: "Address name",
     labelPlaceholder: "Home / Work",
     recipient: "Recipient name *",
@@ -710,11 +710,9 @@ export const en: Dict = {
     changeCover: "Change cover photo",
     uploadingImage: "Uploading photo...",
     imageTypeError: "Unsupported image — please choose JPG, PNG or WebP",
-    imageSizeError: "File is too large — please choose an image no larger than 10 MB",
+    imageSizeError: "File is too large — please choose a smaller image (max 5 MB)",
     imageUploadFailed: "Upload failed — please try again",
-    imageSignatureError: "Couldn't prepare the upload — please try again",
     imageSaveFailed: "Couldn't save the photo — please try again",
-    errorIdLabel: "Error code",
     avatarAlt: "Profile photo of {name}",
     coverAlt: "Cover photo of {name}",
     session: "Session",
@@ -804,7 +802,7 @@ export const en: Dict = {
     ariaMap: "Map to pick the delivery location",
     unsupported: "Your browser doesn't support geolocation — please pick a location on the map instead",
     failed:
-      "Couldn't get your current location — please drag the map to pick a location, then confirm it",
+      "Couldn't get your current location — please pick a location on the map instead (drag the pin or tap the map)",
     denied: "Can't access your current location — please pick a location on the map instead",
     confirm: "Confirm this location",
     confirmed: "Location confirmed",
@@ -813,7 +811,7 @@ export const en: Dict = {
     noResults: "No places found",
     satellite: "Satellite",
     map: "Map",
-    dragHint: "Drag the map to move — the selected point is the center under the pin",
+    dragHint: "Drag the pin or tap the map to adjust",
   },
 
   gate: {
