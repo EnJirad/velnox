@@ -1,7 +1,7 @@
 /**
  * Velnox — Neon schema verification (smoke test).
  *
- * Checks that every Commerce Core table the backend services expect exists,
+ * Checks that every table the backend services expect exists,
  * and reports the columns of the core tables so you can confirm the schema
  * matches the code. Exits with code 1 when a table is missing.
  *
@@ -11,45 +11,56 @@
 import { getPool } from "../backend/db";
 
 const REQUIRED_TABLES = [
-  // base Commerce Core (schema.sql)
+  // ─── Core Commerce (schema.sql) ────────────────────────────────────────
+  "media",
   "users",
+  "user_profiles",
   "sellers",
   "shops",
+  "categories",
   "products",
+  "product_variants",
   "product_images",
   "inventory",
   "addresses",
-  "orders",
-  "order_items",
-  "payments",
-  "refunds",
-  "commissions",
-  "settlements",
-  "subscriptions",
-  // Phase 2 migrations
-  "user_profiles",
-  "categories",
-  "product_variants",
+  // ─── Carts + Wishlists (migration 004) ────────────────────────────────
   "carts",
   "cart_items",
   "wishlists",
   "wishlist_items",
+  // ─── Orders + Payments (schema.sql + migration 005) ───────────────────
+  "orders",
+  "order_items",
+  "payments",
   "payment_transactions",
+  "refunds",
+  "commissions",
+  "settlements",
+  // ─── Subscriptions (schema.sql + migration 007) ───────────────────────
+  "subscriptions",
+  "reviews",
+  "velrepeat_orders",
+  // ─── Logistics (migration 006) ────────────────────────────────────────
   "shipments",
   "tracking_events",
   "returns",
   "return_items",
-  "reviews",
-  "velrepeat_orders",
+  // ─── Finance (migration 008) ──────────────────────────────────────────
+  "financial_ledger",
   "seller_balances",
   "seller_payouts",
-  "financial_ledger",
+  // ─── Platform (migration 010) ─────────────────────────────────────────
   "platform_settings",
   "notifications",
   "audit_logs",
   "staff_profiles",
   "coupons",
   "promotions",
+  // ─── Intelligence (migrations 011, 015) ───────────────────────────────
+  "behavioral_events",
+  "event_flush_cursor",
+  "customer_profiles",
+  "customer_segments",
 ] as const;
 
 const pool = getPool();
