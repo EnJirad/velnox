@@ -4,7 +4,7 @@
 > โปรเจกต์นี้เป็น 1 codebase → 3 เว็บไซต์แยก deploy กัน (velshop / velseller / velcenter)
 > แต่ใช้ **Convex backend + ฐานข้อมูลชุดเดียวกัน**
 
----
+----
 
 ## 📑 สารบัญ
 
