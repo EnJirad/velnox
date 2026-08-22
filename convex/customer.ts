@@ -43,10 +43,11 @@ import { enforceRateLimit } from "./rateLimit";
 import type { Shop } from "../backend/types";
 import {
   ALLOWED_IMAGE_FORMATS,
-  getStorage,
   isStorageConfigured,
   MAX_IMAGE_BYTES,
-} from "../backend/storage";
+  extractObjectKey as r2ExtractObjectKey,
+} from "./lib/storage";
+import { createSignedUploadUrl, deleteR2File } from "./lib/r2presign";
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- DB row mappers */
 function mapShop(r: Record<string, any>): Shop & { productCount: number; orderCount: number; rating: number | null; reviewCount: number } {
@@ -197,32 +198,30 @@ export const myProfile = action({
 });
 
 // ---------------------------------------------------------------------------
-// profile images — storage (Cloudinary) + URL metadata (Neon users)
+// profile images — storage (R2) + URL metadata (Neon users)
 // ---------------------------------------------------------------------------
 /**
  * Step 1 of profile image upload: the signed-in customer asks the backend for
- * a signed upload permit. The browser then POSTs the file straight to
- * Cloudinary with these params (no binary bytes through our server) — the
- * same provider and flow as product images (spec §90: reuse existing storage).
- * File type + max size are enforced by Cloudinary via the signed params AND
- * re-validated in saveProfileImage.
+ * a signed R2 upload URL. The browser then PUTs the file straight to R2
+ * (no binary bytes through our server) — same flow as product images.
+ * File type + max size are re-validated in saveProfileImage.
  */
-export const getProfileImageUploadSignature = action({
-  args: { kind: v.string() },
+export const getProfileImageUploadIntent = action({
+  args: { kind: v.string(), filename: v.string(), mimeType: v.string() },
   handler: async (ctx, args) => {
     const kind = args.kind === "cover" ? "cover" : "avatar";
     if (!isStorageConfigured()) {
       throw new Error(
-        "Image storage is not configured — set CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / " +
-          "CLOUDINARY_API_SECRET in the project Keys/API keys UI.",
+        "Image storage is not configured — set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, " +
+          "R2_SECRET_ACCESS_KEY, R2_BUCKET and R2_PUBLIC_DOMAIN in the project Keys/API keys UI.",
       );
     }
     const { user } = await requireIdentity(ctx);
     await enforceRateLimit(ctx, { name: "profile_image_upload", key: user.id, max: 30, windowMs: 3_600_000 });
-    const storage = getStorage();
-    const folder = `velnox/profiles/${user.id}`;
-    const publicId = `${kind}-${user.id.slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    return { kind, ...storage.getSignedUploadParams(folder, publicId) };
+
+    const objectKey = `user/${user.id}/${kind}/${crypto.randomUUID()}.${args.filename.split(".").pop() || "jpg"}`;
+    const upload = await createSignedUploadUrl(objectKey, args.mimeType, 300);
+    return { kind, uploadUrl: upload.uploadUrl, objectKey, cdnUrl: upload.cdnUrl, expiresAt: upload.expiresAt };
   },
 });
 
@@ -236,7 +235,8 @@ export const getProfileImageUploadSignature = action({
 export const saveProfileImage = action({
   args: {
     kind: v.string(),
-    publicId: v.string(),
+    objectKey: v.string(),
+    cdnUrl: v.string(),
     width: v.optional(v.number()),
     height: v.optional(v.number()),
     format: v.optional(v.string()),
@@ -251,21 +251,24 @@ export const saveProfileImage = action({
       throw new AppError("INVALID_INPUT", `ไฟล์รูปประเภท .${format || "?"} ไม่ได้รับอนุญาต (รองรับ: ${ALLOWED_IMAGE_FORMATS})`);
     }
     if ((args.bytes ?? MAX_IMAGE_BYTES + 1) > MAX_IMAGE_BYTES) {
-      throw new AppError("INVALID_INPUT", "ไฟล์รูปใหญ่เกิน 5 MB");
+      throw new AppError("INVALID_INPUT", "ไฟล์รูปใหญ่เกิน 10 MB");
     }
 
-    const storage = getStorage();
-    const url = storage.originalUrl(args.publicId);
+    const url = args.cdnUrl;
     const column = kind === "cover" ? "cover_url" : "avatar_url";
     const db = getDb();
     await db(`UPDATE users SET ${column} = $2 WHERE id = $1`, [user.id, url]);
+
+    // NOTE: Convex user's `image` field is synced by the frontend calling
+    // patchUserImage directly after upload (ctx.runMutation in 'use node'
+    // actions may not propagate auth context reliably).
 
     // Best-effort binary cleanup of the image this one replaces.
     const oldUrl = kind === "cover" ? user.coverUrl : user.avatarUrl;
     if (oldUrl && isStorageConfigured()) {
       try {
-        const oldId = storage.extractPublicId(oldUrl);
-        if (oldId && oldId !== args.publicId) await storage.deleteFile(oldId);
+        const oldKey = r2ExtractObjectKey(oldUrl);
+        if (oldKey && oldKey !== args.objectKey) await deleteR2File(oldKey);
       } catch (err) {
         console.error("[customer] profile image delete failed (row updated anyway):", err);
       }

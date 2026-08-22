@@ -66,16 +66,30 @@ export async function findOrCreateUser(
   db: Db,
   input: { convexId: string; email?: string | null; name?: string | null; role?: Role },
 ): Promise<User> {
+  // 1. Find by convex_id (fast path)
   const existing = await db("SELECT * FROM users WHERE convex_id = $1 LIMIT 1", [input.convexId]);
   if (existing[0]) return mapUser(existing[0]);
 
+  // 2. Find by email → merge accounts (same email = same person)
+  if (input.email) {
+    const byEmail = await db("SELECT * FROM users WHERE email = $1 LIMIT 1", [input.email]);
+    if (byEmail[0]) {
+      await db(
+        "UPDATE users SET convex_id = $1, name = COALESCE($2, name) WHERE id = $3",
+        [input.convexId, input.name ?? null, byEmail[0].id],
+      );
+      return mapUser({ ...byEmail[0], convex_id: input.convexId });
+    }
+  }
+
+  // 3. Brand-new user
   const rows = await db(
     `INSERT INTO users (convex_id, email, name, role)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (convex_id) DO UPDATE SET
-       email = COALESCE(EXCLUDED.email, users.email),
-       name  = COALESCE(EXCLUDED.name, users.name)
-     RETURNING *`,
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (convex_id) DO UPDATE SET
+         email = COALESCE(EXCLUDED.email, users.email),
+         name  = COALESCE(EXCLUDED.name, users.name)
+       RETURNING *`,
     [input.convexId, input.email ?? null, input.name ?? null, input.role ?? "customer"],
   );
   return mapUser(rows[0]);

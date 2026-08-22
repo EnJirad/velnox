@@ -2,8 +2,8 @@ import type { Doc } from "@convex/_generated/dataModel";
 import { ShoppingBag, Target, TrendingUp, Users, type LucideIcon } from "lucide-react";
 
 export type Goal = Doc<"goals">;
-export type GoalCategory = Goal["category"];
-export type GoalPeriod = Goal["period"];
+export type GoalCategory = "revenue" | "orders" | "customers" | "other";
+export type GoalPeriod = "monthly" | "quarterly" | "yearly";
 
 export const CATEGORY_META: Record<
   GoalCategory,

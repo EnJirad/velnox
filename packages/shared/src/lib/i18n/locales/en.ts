@@ -802,7 +802,7 @@ export const en: Dict = {
     ariaMap: "Map to pick the delivery location",
     unsupported: "Your browser doesn't support geolocation — please pick a location on the map instead",
     failed:
-      "Couldn't get your current location — please pick a location on the map instead (drag the pin or tap the map)",
+      "Couldn't get your current location — please pick a location on the map instead (move the map to position the pin)",
     denied: "Can't access your current location — please pick a location on the map instead",
     confirm: "Confirm this location",
     confirmed: "Location confirmed",
@@ -811,7 +811,8 @@ export const en: Dict = {
     noResults: "No places found",
     satellite: "Satellite",
     map: "Map",
-    dragHint: "Drag the pin or tap the map to adjust",
+    moveHint: "Move the map to adjust — the pin stays centered",
+    satelliteUnavailable: "Satellite imagery unavailable — using standard map",
   },
 
   gate: {

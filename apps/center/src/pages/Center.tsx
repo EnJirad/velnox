@@ -439,7 +439,7 @@ export default function Center() {
   ) => {
     try {
       await setUserAccess({
-        userId,
+        targetUserId: userId,
         role,
         department: department as
           | "general"
@@ -903,7 +903,7 @@ export default function Center() {
                               <div>
                                 <p className="font-medium text-slate-900">{product.name}</p>
                                 <p className="text-xs text-slate-400">
-                                  สต็อก {formatNumber(product.currentStock)} {product.unit}
+                                  สต็อก {formatNumber(product.currentStock ?? 0)} {product.unit}
                                 </p>
                               </div>
                             </div>
@@ -915,8 +915,8 @@ export default function Center() {
                               <p className="text-slate-400">—</p>
                             )}
                             <p className="text-xs text-slate-400">
-                              {product.purchaseCount > 0
-                                ? `เรียนรู้จาก ${product.purchaseCount} ครั้ง`
+                              {product.lastOrderedAt !== undefined
+                                ? "เรียนรู้จากรอบการสั่งจริง"
                                 : "คาดการณ์จากที่ตั้งไว้"}
                             </p>
                           </TableCell>
@@ -991,15 +991,15 @@ export default function Center() {
                         <div>
                           <p className="text-slate-400">สต็อกปัจจุบัน</p>
                           <p className="mt-0.5 font-semibold tabular-nums text-slate-900">
-                            {formatNumber(product.currentStock)} {product.unit}
+                            {formatNumber(product.currentStock ?? 0)} {product.unit}
                           </p>
                         </div>
                         <div>
                           <p className="text-slate-400">รอบการซื้อ</p>
                           <p className="mt-0.5 font-semibold tabular-nums text-slate-900">
                             {cycle !== undefined ? formatDays(cycle) : "—"}
-                            {product.purchaseCount > 0 && (
-                              <span className="ml-1 font-normal text-slate-400">({product.purchaseCount} ครั้ง)</span>
+                            {product.lastOrderedAt !== undefined && (
+                              <span className="ml-1 font-normal text-slate-400">(เรียนรู้แล้ว)</span>
                             )}
                           </p>
                         </div>

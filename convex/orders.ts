@@ -28,7 +28,7 @@ const fetchOrdersWithItems = async (ctx: QueryCtx, orderIds: Id<"orders">[]) => 
     if (!order) continue;
     const items = await ctx.db
       .query("orderItems")
-      .withIndex("by_order", (q) => q.eq("orderId", order._id))
+      .withIndex("by_order", (q) => q.eq("orderId", order._id as unknown as string))
       .collect();
     rows.push({ order, items });
   }
@@ -51,22 +51,23 @@ export const customerRegulars = query({
 
     const orders = await ctx.db
       .query("orders")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", user._id as unknown as string))
       .order("desc")
       .take(100);
 
     const active = orders.filter((o) => o.status !== "cancelled");
     const byProduct = new Map<
-      Id<"products">,
+      string,
       { times: number; qty: number; lastOrderedAt: number }
     >();
 
     for (const order of active) {
       const items = await ctx.db
         .query("orderItems")
-        .withIndex("by_order", (q) => q.eq("orderId", order._id))
+        .withIndex("by_order", (q) => q.eq("orderId", order._id as unknown as string))
         .collect();
       for (const item of items) {
+        if (!item.productId) continue;
         const agg = byProduct.get(item.productId) ?? {
           times: 0,
           qty: 0,
@@ -74,7 +75,7 @@ export const customerRegulars = query({
         };
         agg.times += 1;
         agg.qty += item.quantity;
-        agg.lastOrderedAt = Math.max(agg.lastOrderedAt, order.createdAt);
+        agg.lastOrderedAt = Math.max(agg.lastOrderedAt, order.createdAt ?? 0);
         byProduct.set(item.productId, agg);
       }
     }
@@ -87,7 +88,7 @@ export const customerRegulars = query({
     }[] = [];
 
     for (const [productId, agg] of byProduct) {
-      const product = await ctx.db.get(productId);
+      const product = await ctx.db.get(productId as Id<"products">);
       if (!product || !product.published || product.price === undefined) continue;
       rows.push({ product, ...agg });
     }
@@ -107,7 +108,7 @@ export const myOrders = query({
     if (user === null) throw new Error("Not authenticated");
     const orders = await ctx.db
       .query("orders")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", user._id as unknown as string))
       .order("desc")
       .take(50);
     return fetchOrdersWithItems(ctx, orders.map((o) => o._id));
@@ -135,7 +136,7 @@ export const allOrders = query({
 
     const myProducts = await ctx.db
       .query("products")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", user._id as unknown as string))
       .collect();
     const myIds = new Set(myProducts.map((p) => p._id));
 
@@ -143,9 +144,9 @@ export const allOrders = query({
     for (const order of orders) {
       const items = await ctx.db
         .query("orderItems")
-        .withIndex("by_order", (q) => q.eq("orderId", order._id))
+        .withIndex("by_order", (q) => q.eq("orderId", order._id as unknown as string))
         .collect();
-      const mine = items.filter((i) => myIds.has(i.productId));
+      const mine = items.filter((i) => myIds.has(i.productId as unknown as Id<"products">));
       if (mine.length === 0) continue;
       rows.push({ order, items: mine });
     }
@@ -169,7 +170,7 @@ export const sellerIncome = query({
 
     const myProducts = await ctx.db
       .query("products")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", user._id as unknown as string))
       .collect();
     const myIds = new Set(myProducts.map((p) => p._id));
     const orders = await ctx.db.query("orders").order("desc").take(200);
@@ -188,9 +189,9 @@ export const sellerIncome = query({
     for (const order of orders) {
       const items = await ctx.db
         .query("orderItems")
-        .withIndex("by_order", (q) => q.eq("orderId", order._id))
+        .withIndex("by_order", (q) => q.eq("orderId", order._id as unknown as string))
         .collect();
-      const mine = items.filter((i) => myIds.has(i.productId));
+      const mine = items.filter((i) => myIds.has(i.productId as unknown as Id<"products">));
       if (mine.length === 0) continue;
       const subtotal = Math.round(mine.reduce((s, i) => s + i.subtotal, 0) * 100) / 100;
       const qty = mine.reduce((s, i) => s + i.quantity, 0);
@@ -216,7 +217,7 @@ export const sellerIncome = query({
     const payout =
       Math.round((gross - commission - (returns - returnCoverage)) * 100) / 100;
 
-    transactions.sort((a, b) => b.order.createdAt - a.order.createdAt);
+    transactions.sort((a, b) => (b.order.createdAt ?? 0) - (a.order.createdAt ?? 0));
 
     return {
       gross,
@@ -249,13 +250,13 @@ export const updateStatus = mutation({
     if (status === "cancelled" && order.status !== "cancelled") {
       const items = await ctx.db
         .query("orderItems")
-        .withIndex("by_order", (q) => q.eq("orderId", order._id))
+        .withIndex("by_order", (q) => q.eq("orderId", order._id as unknown as string))
         .collect();
       for (const item of items) {
-        const product = await ctx.db.get(item.productId);
+        const product = await ctx.db.get(item.productId as Id<"products">);
         if (product) {
           await ctx.db.patch(product._id, {
-            currentStock: Math.max(0, product.currentStock + item.quantity),
+            currentStock: Math.max(0, (product.currentStock ?? 0) + item.quantity),
             updatedAt: Date.now(),
           });
         }

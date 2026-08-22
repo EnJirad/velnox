@@ -131,7 +131,7 @@ src/convex/commerce.ts # "use node" — Convex node actions เรียก src/
 - [x] `db/schema.sql` + `db/migrate.ts` (script `bun run db:migrate`) + `db/smoke.ts` (`bun run db:smoke`)
 - [x] `src/backend/*` — Commerce Core layer (รวม rename Merchant -> Seller)
 - [x] `src/convex/commerce.ts` — Convex node actions bridge
-- [ ] ผู้ใช้ตั้ง `DATABASE_URL` + Cloudinary keys (ใน Keys/API keys) แล้วรัน `bun run db:migrate`
+- [ ] ผู้ใช้ตั้ง `DATABASE_URL` + R2 keys (ใน Keys/API keys) แล้วรัน `bun run db:migrate`
 
 ### Phase 1 — วางฐานข้อมูล
 1. ผู้ใช้ตั้ง `DATABASE_URL` → รัน `bun run db:migrate`
@@ -171,11 +171,11 @@ src/convex/commerce.ts # "use node" — Convex node actions เรียก src/
 3. Event bridge: Neon เปลี่ยนสถานะ (order/payment/inventory) → Convex mutation บันทึก `realtime_state` → frontend subscribe (เพิ่ม `realtime_events` table ใน Convex ภายหลัง)
 
 ### Phase 5.5 — Product Image Upload (ทำเสร็จแล้ว)
-- ระบบอัปโหลดรูปสินค้าแบบ Marketplace: **Cloudinary** (signed upload ตรงจากเบราว์เซอร์)
+- ระบบอัปโหลดรูปสินค้าแบบ Marketplace: **Cloudflare R2** (signed PUT URL ตรงจากเบราว์เซอร์)
 - Neon `product_images` เก็บ metadata เท่านั้น (url/storage_key/alt/sort/primary/dimensions) — **ห้ามเก็บ binary ใน Neon**
-- Flow: `getProductImageUploadSignature` (node action) → browser POST ตรงไป Cloudinary → `saveProductImage` (node action: re-validate + persist)
-- ลบรูป → ลบ row + ลบ binary จาก storage (best-effort)
-- Required env: `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET`
+- Flow: `getProductImageUploadIntent` (node action → signed R2 PUT URL) → browser PUT ตรงไป R2 → `saveProductImage` (node action: re-validate + persist)
+- ลบรูป → ลบ row + ลบ binary จาก R2 (best-effort)
+- Required env: `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` / `R2_PUBLIC_DOMAIN`
 
 ### Phase 6 — Cleanup
 - ลบตาราง Convex ที่ย้ายไป Neon แล้ว (ทีละตัว หลัง E2E ผ่าน)

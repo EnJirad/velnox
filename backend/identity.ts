@@ -13,9 +13,10 @@
 import type { ActionCtx } from "../convex/_generated/server";
 import { getDb } from "./db";
 import { AppError, authRequired, forbidden } from "./errors";
-import { getSellerByOwner, getUserByConvexId } from "./sellers";
+import { getSellerByOwner } from "./sellers";
 import { requirePermission as checkPermission } from "./permissions";
-import type { Permission, Role, Seller, User } from "./types";
+import type { Department, Permission, Role, Seller, User } from "./types";
+import { toMs } from "./dates";
 
 export interface Identity {
   subject: string;
@@ -24,33 +25,86 @@ export interface Identity {
   user: User;
 }
 
+function rowToUser(row: Record<string, unknown>) {
+  return {
+    id: row.id as string,
+    convexId: row.convex_id as string,
+    email: (row.email as string) ?? null,
+    phone: (row.phone as string) ?? null,
+    name: (row.name as string) ?? null,
+    role: row.role as Role,
+    department: (row.department as Department) ?? null,
+    avatarUrl: (row.avatar_url as string) ?? null,
+    coverUrl: (row.cover_url as string) ?? null,
+    createdAt: toMs(row.created_at),
+  };
+}
+
 export async function requireIdentity(ctx: ActionCtx): Promise<Identity> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw authRequired();
   const db = getDb();
-  let user = await getUserByConvexId(db, identity.subject);
-  if (!user) {
-    // first visit — create the Neon user row (auth stays in Convex)
-    const rows = await db(
-      `INSERT INTO users (convex_id, email, name, role)
-       VALUES ($1, $2, $3, 'customer')
-       RETURNING *`,
+
+  // --- Strategy 1: find existing user by convex_id (fast path) ---
+  const existing = await db(
+    "SELECT * FROM users WHERE convex_id = $1 LIMIT 1",
+    [identity.subject],
+  );
+  if (existing[0]) {
+    // Merge name/email from auth provider (never overwrite avatar/profile)
+    await db(
+      `UPDATE users
+         SET email = COALESCE($2, email),
+             name  = COALESCE($3, name)
+       WHERE convex_id = $1`,
       [identity.subject, identity.email ?? null, identity.name ?? null],
     );
-    user = {
-      id: rows[0].id,
-      convexId: rows[0].convex_id,
-      email: rows[0].email ?? null,
-      phone: rows[0].phone ?? null,
-      name: rows[0].name ?? null,
-      role: rows[0].role,
-      department: rows[0].department ?? null,
-      avatarUrl: rows[0].avatar_url ?? null,
-      coverUrl: rows[0].cover_url ?? null,
-      createdAt: rows[0].created_at,
+    return {
+      subject: identity.subject,
+      email: identity.email ?? null,
+      name: identity.name ?? null,
+      user: rowToUser(existing[0]),
     };
   }
-  return { subject: identity.subject, email: identity.email ?? null, name: identity.name ?? null, user };
+
+  // --- Strategy 2: email already exists with a different convex_id → merge ---
+  if (identity.email) {
+    const byEmail = await db(
+      "SELECT * FROM users WHERE email = $1 LIMIT 1",
+      [identity.email],
+    );
+    if (byEmail[0]) {
+      // Link this new convex_id to the existing user record.
+      // All profile data (avatar, cover, addresses, orders) is preserved.
+      await db(
+        "UPDATE users SET convex_id = $1, name = COALESCE($2, name) WHERE id = $3",
+        [identity.subject, identity.name ?? null, byEmail[0].id],
+      );
+      return {
+        subject: identity.subject,
+        email: identity.email,
+        name: identity.name ?? null,
+        user: rowToUser({ ...byEmail[0], convex_id: identity.subject }),
+      };
+    }
+  }
+
+  // --- Strategy 3: brand-new user → insert ---
+  const rows = await db(
+    `INSERT INTO users (convex_id, email, name, role)
+       VALUES ($1, $2, $3, 'customer')
+       ON CONFLICT (convex_id) DO UPDATE SET
+         email = COALESCE(EXCLUDED.email, users.email),
+         name  = COALESCE(EXCLUDED.name, users.name)
+       RETURNING *`,
+    [identity.subject, identity.email ?? null, identity.name ?? null],
+  );
+  return {
+    subject: identity.subject,
+    email: identity.email ?? null,
+    name: identity.name ?? null,
+    user: rowToUser(rows[0]),
+  };
 }
 
 /** Require the user's role to be one of the allowed roles. */

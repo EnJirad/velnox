@@ -24,7 +24,7 @@ interface ImageUploaderProps {
 }
 
 export function ImageUploader({ product, onChange }: ImageUploaderProps) {
-  const getSignature = useAction(api.commerce.getProductImageUploadSignature);
+  const getUploadIntent = useAction(api.commerce.getProductImageUploadIntent);
   const saveImage = useAction(api.commerce.saveProductImage);
   const deleteImage = useAction(api.commerce.deleteProductImageAction);
   const setPrimary = useAction(api.commerce.setPrimaryProductImageAction);
@@ -50,46 +50,34 @@ export function ImageUploader({ product, onChange }: ImageUploaderProps) {
           toast.error(`ไฟล์ ${file.name} ไม่ใช่รูปภาพที่รองรับ`);
           continue;
         }
-        if (file.size > 5 * 1024 * 1024) {
-          toast.error(`ไฟล์ ${file.name} ใหญ่เกิน 5 MB`);
+        if (file.size > 10 * 1024 * 1024) {
+          toast.error(`ไฟล์ ${file.name} ใหญ่เกิน 10 MB`);
           continue;
         }
-        // 1. signed upload permit (server validates the seller owns the product)
-        const sig = await getSignature({ productId: product.id });
-        // 2. direct upload to Cloudinary from the browser
-        const body = new FormData();
-        body.append("file", file);
-        body.append("folder", sig.folder);
-        body.append("public_id", sig.publicId);
-        body.append("timestamp", String(sig.timestamp));
-        body.append("api_key", sig.apiKey);
-        body.append("signature", sig.signature);
-        body.append("allowed_formats", sig.allowedFormats);
-        body.append("max_bytes", String(sig.maxBytes));
-        const res = await fetch(
-          `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`,
-          { method: "POST", body },
-        );
-        const data = (await res.json()) as {
-          secure_url?: string;
-          public_id?: string;
-          width?: number;
-          height?: number;
-          format?: string;
-          bytes?: number;
-          error?: { message?: string };
-        };
-        if (!res.ok || !data.public_id) {
-          throw new Error(data.error?.message ?? "Cloudinary upload failed");
+        // 1. Get signed R2 upload URL (server validates the seller owns the product)
+        const intent = await getUploadIntent({
+          productId: product.id,
+          filename: file.name,
+          mimeType: file.type,
+        });
+        // 2. Direct PUT upload to R2 from the browser (no binary through server)
+        const uploadRes = await fetch(intent.uploadUrl, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        });
+        if (!uploadRes.ok) {
+          throw new Error(`R2 upload failed: ${uploadRes.status}`);
         }
-        // 3. persist metadata in Neon (server re-validates type/size + ownership)
+        // 3. Persist metadata in Neon (server re-validates type/size + ownership)
         const updated = await saveImage({
           productId: product.id,
-          publicId: data.public_id,
-          width: data.width,
-          height: data.height,
-          format: data.format,
-          bytes: data.bytes,
+          objectKey: intent.objectKey,
+          cdnUrl: intent.cdnUrl,
+          width: undefined,
+          height: undefined,
+          format: file.type.split("/")[1] || "jpg",
+          bytes: file.size,
         });
         if (updated) onChange(updated);
         toast.success(`อัปโหลด "${file.name}" แล้ว`);
@@ -159,7 +147,7 @@ export function ImageUploader({ product, onChange }: ImageUploaderProps) {
         </div>
         <Badge className="gap-1 rounded-full bg-[#ECFDF5] text-emerald-700 ring-1 ring-inset ring-emerald-600/15 hover:bg-[#ECFDF5]">
           <Crown className="size-3" />
-          Cloudinary CDN
+          R2 CDN
         </Badge>
       </div>
 

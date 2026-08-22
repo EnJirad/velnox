@@ -3,7 +3,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@velnox/shared/components/ui/card";
@@ -20,7 +19,7 @@ import {
   recentGoogleAuthStart,
   type GoogleAuthErrorKind,
 } from "@velnox/shared/lib/auth-flow";
-import { Loader2, UserX } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -98,8 +97,15 @@ function Auth() {
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get("returnTo");
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  };
+
   const [signingIn, setSigningIn] = useState(false); // Google flow in progress
-  const [guestLoading, setGuestLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const signingInRef = useRef(false); // double-click / double-start guard
 
@@ -162,7 +168,7 @@ function Auth() {
    * the identities are linked by the verified email.
    */
   const handleGoogleSignIn = async () => {
-    if (signingInRef.current || guestLoading) return;
+    if (signingInRef.current) return;
     signingInRef.current = true;
     setSigningIn(true);
     setError(null);
@@ -185,21 +191,7 @@ function Auth() {
     }
   };
 
-  /** Guest (anonymous) browsing — the session merges into the account on sign-in. */
-  const handleGuestLogin = async () => {
-    if (guestLoading || signingIn) return;
-    setGuestLoading(true);
-    setError(null);
-    try {
-      await signIn("anonymous");
-    } catch (error) {
-      console.error("[auth] Guest login error:", error);
-      setError(t("auth.guestError", { message: error instanceof Error ? error.message : "unknown" }));
-      setGuestLoading(false);
-    }
-  };
-
-  const busy = signingIn || guestLoading;
+  const busy = signingIn;
 
   // No login-form flash (spec §92–§97, §99–§100): while the session is still
   // loading — or right after authentication resolved but before the redirect
@@ -220,8 +212,17 @@ function Auth() {
     <div className="min-h-screen flex flex-col bg-background">
       {/* Auth Content — centered card on desktop, app-like on mobile */}
       <div className="flex-1 flex items-center justify-center px-4 py-8 pb-[max(env(safe-area-inset-bottom),2rem)]">
-        <Card className="w-full max-w-[400px] border shadow-md pb-0">
+        <Card className="relative w-full max-w-[400px] border shadow-md pb-0">
           <CardHeader className="text-center">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="absolute left-4 top-4 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              aria-label="ย้อนกลับ"
+            >
+              <ArrowLeft className="size-4" />
+              ย้อนกลับ
+            </button>
             <button
               type="button"
               onClick={() => navigate("/")}
@@ -266,32 +267,6 @@ function Auth() {
               {t("auth.terms")}
             </p>
           </CardContent>
-
-          <CardFooter className="flex-col gap-2 px-6 pb-4">
-            <div className="relative w-full">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">{t("auth.or")}</span>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-11 w-full gap-2 text-sm text-muted-foreground"
-              onClick={handleGuestLogin}
-              disabled={busy}
-            >
-              {guestLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <UserX className="h-4 w-4" />
-              )}
-              {t("auth.guest")}
-            </Button>
-          </CardFooter>
 
           <div className="rounded-b-lg border-t bg-muted px-6 py-4 text-center text-xs text-muted-foreground">
             <div className="mb-1.5 flex items-center justify-center gap-2">

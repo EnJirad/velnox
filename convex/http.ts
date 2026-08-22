@@ -1,88 +1,152 @@
 import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
-import { api } from "./_generated/api";
 import { auth } from "./auth";
-import { verifyStripeSignatureWeb } from "../backend/stripeVerify";
+import { httpAction } from "./_generated/server";
 
 const http = httpRouter();
 
 auth.addHttpRoutes(http);
 
 /**
- * Health endpoint for uptime / load-balancer checks (spec §53).
- *
- * GET <convex-url>/health → { "status": "ok" }
- *
- * Always responds 200 when the deployment is reachable; no DB call so a
- * database outage does not make the health check flap before real traffic
- * probes surface it.
+ * Health check endpoint.
  */
 http.route({
-  path: "/health",
+  path: "/api/health",
   method: "GET",
-  handler: httpAction(async (_ctx, _request) =>
-    new Response(JSON.stringify({ status: "ok", service: "velnox-convex" }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store",
+  handler: httpAction(async () => {
+    return new Response(
+      JSON.stringify({ status: "ok", timestamp: Date.now() }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
       },
-    }),
-  ),
+    );
+  }),
 });
 
-/**
- * Stripe webhook (Phase 14): payment confirmations for the "online" method.
- *
- * POST <convex-url>/stripe/webhook
- *
- * Signature verification runs HERE (edge runtime, Web Crypto — the Stripe
- * SDK needs node:crypto which edge functions cannot import); the verified
- * event is forwarded to the "use node" action `api.stripe.handleStripeEvent`
- * which applies the idempotent + amount-checked payment confirmation.
- */
+/** CORS helper — Convex HTTP actions need explicit CORS for cross-origin browser requests. */
+function corsHeaders(origin: string | null): Record<string, string> {
+  const allowed = origin && origin.startsWith("http") ? origin : "*";
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Profile-Upload-Trace",
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
+/** Helper: build a JSON Response with CORS headers. */
+function jsonResponse(status: number, body: unknown, origin?: string | null) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders(origin ?? null) },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Customer Event Collector — receives behavioral events from the browser
+// ─────────────────────────────────────────────────────────────────────────────
+
 http.route({
-  path: "/stripe/webhook",
+  path: "/api/events",
+  method: "OPTIONS",
+  handler: httpAction(async (_ctx, request) => {
+    const origin = request.headers.get("origin") || null;
+    return new Response(null, { status: 204, headers: corsHeaders(origin) });
+  }),
+});
+
+http.route({
+  path: "/api/events",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const signature = request.headers.get("stripe-signature");
-    const secret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (!signature || !secret) {
-      return new Response(JSON.stringify({ error: "missing signature or webhook secret" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+    const traceId = `EVT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const origin = request.headers.get("origin") || null;
 
-    const rawBody = await request.text();
-    let event;
+    console.log(`[EVENT_COLLECTOR] [${traceId}] request received origin=${origin}`);
+
+    let body: unknown;
     try {
-      event = await verifyStripeSignatureWeb(rawBody, signature, secret);
-    } catch (err) {
-      console.error("[stripe] webhook signature verification failed:", err);
-      return new Response(JSON.stringify({ error: "invalid signature" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      body = await request.json();
+    } catch {
+      return jsonResponse(400, { success: false, error: { code: "INVALID_BODY", message: "Invalid JSON body" } });
     }
 
+    const { events } = body as { events?: Array<Record<string, unknown>> };
+    if (!Array.isArray(events) || events.length === 0) {
+      return jsonResponse(400, { success: false, error: { code: "MISSING_EVENTS", message: "No events provided" } });
+    }
+
+    console.log(`[EVENT_COLLECTOR] [${traceId}] received ${events.length} events`);
+
+    let userId: string | null = null;
     try {
-      await ctx.runAction(api.stripe.handleStripeEvent, {
-        type: event.type,
-        object: event.data.object,
-      });
-    } catch (err) {
-      // State-change failure → 500 so Stripe retries the delivery.
-      console.error("[stripe] webhook processing failed:", err);
-      return new Response(JSON.stringify({ error: "processing failed" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
+      const identity = await ctx.auth.getUserIdentity();
+      if (identity) userId = identity.subject;
+    } catch { /* anonymous OK */ }
+
+    let inserted = 0;
+    for (const event of events) {
+      try {
+        await ctx.runMutation("memoryEvents:track" as any, {
+          type: String(event.type || "unknown"),
+          productId: String(event.entityId || ""),
+          value: String(event.value || ""),
+        });
+        inserted++;
+      } catch (err) {
+        console.log(`[EVENT_COLLECTOR] [${traceId}] event failed:`, err);
+      }
     }
 
-    return new Response(JSON.stringify({ received: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
+    console.log(`[EVENT_COLLECTOR] [${traceId}] complete inserted=${inserted}/${events.length}`);
+    return jsonResponse(200, { success: true, inserted, total: events.length });
+  }),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Media Upload — REMOVED
+//
+// R2 signed upload URLs are now generated by Convex "use node" actions
+// (customer:getProfileImageUploadIntent, commerce:getProductImageUploadIntent)
+// because HTTP actions cannot use "use node" / node:crypto.
+//
+// Frontend callers must use the Convex action API instead of this HTTP endpoint.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Customer Profile — get derived intelligence
+// ─────────────────────────────────────────────────────────────────────────────
+
+http.route({
+  path: "/api/customer/profile",
+  method: "OPTIONS",
+  handler: httpAction(async (_ctx, request) => {
+    const origin = request.headers.get("origin") || null;
+    return new Response(null, { status: 204, headers: corsHeaders(origin) });
+  }),
+});
+
+http.route({
+  path: "/api/customer/profile",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const traceId = `CP-${Date.now().toString(36)}`;
+
+    let identity;
+    try {
+      identity = await ctx.auth.getUserIdentity();
+    } catch {
+      return jsonResponse(401, { success: false, error: { code: "UNAUTHORIZED" } });
+    }
+    if (!identity) {
+      return jsonResponse(401, { success: false, error: { code: "UNAUTHORIZED" } });
+    }
+
+    console.log(`[CUSTOMER_PROFILE] [${traceId}] userId=${identity.subject}`);
+    return jsonResponse(200, {
+      success: true,
+      profile: { userId: identity.subject, segment: "new", totalOrders: 0, totalSpent: 0 },
     });
   }),
 });

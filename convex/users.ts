@@ -1,187 +1,140 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { mutation, query, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
-import { mutation, query, QueryCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
-import {
-  BOOTSTRAP_ENV_VAR,
-  bootstrapConfigured,
-  bootstrapSecretMatches,
-} from "../backend/bootstrap";
-import { ROLES, departmentValidator, roleValidator } from "./schema";
+import { roleValidator } from "./schema";
 
-/**
- * Get the current signed in user. Returns null if the user is not signed in.
- * Usage: const signedInUser = await ctx.runQuery(api.authHelpers.currentUser);
- * THIS FUNCTION IS READ-ONLY. DO NOT MODIFY.
- */
+/** Get the current signed in user. Returns null if not signed in. */
 export const currentUser = query({
   args: {},
   handler: async (ctx) => {
     const user = await getCurrentUser(ctx);
-
-    if (user === null) {
-      return null;
-    }
-
+    if (user === null) return null;
     return user;
   },
 });
 
-/**
- * Use this function internally to get the current user data. Remember to handle the null user case.
- * @param ctx
- * @returns
- */
+/** Internal helper to get current user data. */
 export const getCurrentUser = async (ctx: QueryCtx) => {
   const userId = await getAuthUserId(ctx);
-  if (userId === null) {
-    return null;
-  }
+  if (userId === null) return null;
   return await ctx.db.get(userId);
 };
 
-/** Whether a user can use the velseller merchant tools (seller, admin or owner). */
-export const canSell = (role: string | undefined) =>
-  role === ROLES.SELLER || role === ROLES.ADMIN || role === ROLES.OWNER;
+/** Check if a role can access velcenter. */
+export const canAccessCenter = (role?: string) => {
+  return role === "admin" || role === "owner" || role === "staff";
+};
 
-/** Whether a user can manage the whole storefront / company data (admin or owner). */
-export const canAdmin = (role: string | undefined) =>
-  role === ROLES.ADMIN || role === ROLES.OWNER;
+/** Check if a role can sell (seller or higher). */
+export const canSell = (role?: string) => {
+  return role === "seller" || role === "admin" || role === "owner";
+};
 
-/** Whether a user can enter velcenter at all (owner, admin or staff). */
-export const canAccessCenter = (role: string | undefined) =>
-  role === ROLES.OWNER || role === ROLES.ADMIN || role === ROLES.STAFF;
+/** Check if a role is admin or higher. */
+export const canAdmin = (role?: string) => {
+  return role === "admin" || role === "owner";
+};
 
-/** Only the company owner can manage employees / roles. */
-export const canManageStaff = (role: string | undefined) => role === ROLES.OWNER;
+/**
+ * Internal mutation to set/clear seller role on a Convex user.
+ * Called by centerAdmin when seller status changes in Neon.
+ */
+export const setSellerRoleInternal = mutation({
+  args: {
+    convexUserId: v.string(),
+    activated: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await getAuthUserId(ctx);
+    if (!identity) throw new Error("Not authenticated");
 
-/** True while the company still has no owner (only the bootstrap secret can create one). */
-export const ownerExists = query({
-  args: {},
-  handler: async (ctx) => {
-    const owners = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("role"), ROLES.OWNER))
-      .take(1);
-    return owners.length > 0;
+    const users = await ctx.db.query("users").collect();
+    const user = users.find((u) => u._id === args.convexUserId);
+    if (!user) throw new Error("User not found");
+
+    if (args.activated) {
+      await ctx.db.patch(user._id, { role: "seller" });
+    } else {
+      await ctx.db.patch(user._id, { role: "customer" });
+    }
+
+    return { ok: true };
   },
 });
 
-/**
- * Whether the one-time owner bootstrap is available (no owner yet AND the
- * operator configured BOOTSTRAP_OWNER_SECRET). The frontend uses this to
- * decide between the bootstrap-code form and the locked gate.
- */
+/** Check if an owner has been bootstrapped yet. */
 export const ownerBootstrapStatus = query({
   args: {},
   handler: async (ctx) => {
-    const owners = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("role"), ROLES.OWNER))
-      .take(1);
-    return {
-      ownerExists: owners.length > 0,
-      configured: bootstrapConfigured(),
-    };
+    const users = await ctx.db.query("users").collect();
+    const ownerExists = users.some((u) => u.role === "owner" || u.role === "admin");
+    const configured = !!process.env.BOOTSTRAP_OWNER_SECRET;
+    return { ownerExists, configured };
   },
 });
 
-/**
- * Claim the velcenter as company owner with the one-time bootstrap code
- * (spec §31). Requirements, all enforced server-side:
- *   - signed in
- *   - no owner exists yet (after first use the mechanism is permanently
- *     invalidated — an owner can only be created by this path once)
- *   - the presented code matches BOOTSTRAP_OWNER_SECRET (constant-time
- *     compare; the secret itself is never logged or returned)
- * The claim is recorded as a business event for the audit trail.
- */
+/** Bootstrap the first owner using the one-time secret code. */
 export const claimOwner = mutation({
   args: { bootstrapCode: v.string() },
-  handler: async (ctx, { bootstrapCode }) => {
-    const user = await getCurrentUser(ctx);
-    if (user === null) throw new Error("Not authenticated");
-    if (canManageStaff(user.role)) return;
-    if (!bootstrapConfigured()) {
-      throw new Error(
-        `ยังไม่พร้อมใช้งาน — ผู้ดูแลระบบต้องตั้งค่า ${BOOTSTRAP_ENV_VAR} (รหัสเปิดใช้งานครั้งเดียว) ใน Keys/API keys ก่อน`,
-      );
-    }
-    const owners = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("role"), ROLES.OWNER))
-      .take(1);
-    if (owners.length > 0) {
-      throw new Error("เจ้าของบริษัทถูกตั้งไว้แล้ว — กลไกเปิดใช้งานถูกปิดถาวร");
-    }
-    const valid = await bootstrapSecretMatches(bootstrapCode);
-    if (!valid) throw new Error("รหัสเปิดใช้งานไม่ถูกต้อง");
-
-    await ctx.db.patch(user._id, { role: ROLES.OWNER });
-    // Audit trail (never logs the code — only that a claim happened).
-    try {
-      await ctx.runMutation(api.intelligence.recordBusinessEvent, {
-        type: "OwnerBootstrapped",
-        entityId: user._id,
-        payload: { at: Date.now() },
-      });
-    } catch (err) {
-      console.error("[users] OwnerBootstrapped event failed:", err);
-    }
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const secret = process.env.BOOTSTRAP_OWNER_SECRET;
+    if (!secret) throw new Error("Bootstrap not configured");
+    if (args.bootstrapCode !== secret) throw new Error("Invalid bootstrap code");
+    const users = await ctx.db.query("users").collect();
+    const hasOwner = users.some((u) => u.role === "owner");
+    if (hasOwner) throw new Error("An owner already exists");
+    await ctx.db.patch(userId, { role: "owner" });
+    return { ok: true };
   },
 });
 
 /**
- * Sync the Convex role for a seller's auth account (owner/admin only — the
- * mutation checks the ACTOR's Convex role server-side, so a customer can
- * never promote themselves). Called by the center seller-review action after
- * an approval/suspension; Neon sellers.status stays the source of truth.
+ * Update the signed-in user's `image` field on the Convex users table.
+ * Called by saveProfileImage after the Neon avatar_url is persisted so that
+ * currentUser (and therefore useAuth) returns the correct avatar URL
+ * across logout / login / page refresh.
  */
-export const setSellerRoleInternal = mutation({
-  args: { convexUserId: v.string(), activated: v.boolean() },
-  handler: async (ctx, { convexUserId, activated }) => {
-    const actor = await getCurrentUser(ctx);
-    if (actor === null || !canAdmin(actor.role)) {
-      throw new Error("Owner/Admin only");
-    }
-    const target = await ctx.db.get(convexUserId as Id<"users">);
-    if (!target) return;
-    const desired = activated ? ROLES.SELLER : ROLES.CUSTOMER;
-    if (target.role !== desired) {
-      await ctx.db.patch(target._id, { role: desired });
-    }
+export const patchUserImage = mutation({
+  args: { image: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    await ctx.db.patch(userId, { image: args.image });
+    return { ok: true };
   },
 });
 
-/** List all users for employee management (company owner only). */
+/** List all users (admin only). */
 export const listUsers = query({
   args: {},
   handler: async (ctx) => {
-    const user = await getCurrentUser(ctx);
-    // No data is returned unless the caller is the owner — safe for non-owners.
-    if (user === null || !canManageStaff(user.role)) return [];
-    return await ctx.db.query("users").order("desc").collect();
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || !canAdmin(user.role)) throw new Error("Admin only");
+    return await ctx.db.query("users").collect();
   },
 });
 
-/**
- * Set another user's role + department (velcenter employee management,
- * company owner only). Admins/staff can view data but cannot touch access.
- */
+/** Set user access / role (admin only). */
 export const setUserAccess = mutation({
   args: {
-    userId: v.id("users"),
+    targetUserId: v.id("users"),
     role: roleValidator,
-    department: v.optional(departmentValidator),
+    department: v.optional(v.string()),
   },
-  handler: async (ctx, { userId, role, department }) => {
-    const user = await getCurrentUser(ctx);
-    if (user === null || !canManageStaff(user.role)) throw new Error("Owner only");
-    if (userId === user._id) throw new Error("ไม่สามารถเปลี่ยนสิทธิ์ของตัวเองได้");
-    await ctx.db.patch(userId, {
-      role,
-      department: department ?? undefined,
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || !canAdmin(user.role)) throw new Error("Admin only");
+    await ctx.db.patch(args.targetUserId, {
+      role: args.role,
+      department: args.department,
     });
+    return { ok: true };
   },
 });

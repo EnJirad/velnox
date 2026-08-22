@@ -133,7 +133,7 @@ DATABASE_URL="<neon-connection-string>" bun run db:migrate   # สร้าง�
 DATABASE_URL="<neon-connection-string>" bun run db:smoke     # ตรวจว่าตารางครบ (optional)
 ```
 
-> รูปสินค้าถ้าอยากเริ่มขายได้ทันที ต้องครบทั้ง 3 ค่า Cloudinary — ถ้ายังไม่ตั้ง ระบบจะยังทำงานได้
+> รูปสินค้าถ้าอยากเริ่มขายได้ทันที ต้องตั้งค่า R2 (Cloudflare R2) — ถ้ายังไม่ตั้ง ระบบจะยังทำงานได้
 > แต่ฟีเจอร์อัปโหลดรูปจะแจ้งว่ายังไม่ได้ตั้งค่า
 
 ### ขั้นที่ 6 — รันโปรเจกต์
@@ -178,7 +178,7 @@ bun run build           # build production (ได้ไฟล์แยก 4 ent
 | ตัวแปร | จำเป็น? | คำอธิบาย |
 |---|---|---|
 | `DATABASE_URL` | ✅ (Commerce) | Neon connection string — **Commerce Core** (สินค้า ออเดอร์ เงิน สต็อก ฯลฯ) |
-| `CLOUDINARY_CLOUD_NAME` / `_API_KEY` / `_API_SECRET` | ✅ (อัปโหลดรูป) | Cloudinary — เก็บรูปสินค้า (upload ตรงจากเบราว์เซอร์ ผ่าน signed params) |
+| `R2_ACCOUNT_ID` / `_ACCESS_KEY_ID` / `_SECRET_ACCESS_KEY` / `_BUCKET` / `_PUBLIC_DOMAIN` | ✅ (อัปโหลดรูป) | Cloudflare R2 — เก็บรูปสินค้า (browser PUT ตรงผ่าน signed URL) |
 | `JWKS` | ✅ | คีย์ของ Convex Auth (สร้างอัตโนมัติใน Freebuff) |
 | `JWT_PRIVATE_KEY` | ✅ | คีย์ JWT ของ Convex Auth (สร้างอัตโนมัติใน Freebuff) |
 | `SITE_URL` | ❌ | โดเมนของเว็บ (ใช้สร้างลิงก์ในอีเมล + return URL หลังชำระเงินออนไลน์) เช่น `http://localhost:5173` |
@@ -224,7 +224,7 @@ bun run build           # build production (ได้ไฟล์แยก 4 ent
 > เริ่มต้น: ไปที่ velseller → กด "เปิดร้านของฉัน" (เลื่อนบทบาทเป็น seller — MVP ยังเป็น self-serve)
 
 1. **แดชบอร์ดเป้าหมาย** — ตั้งเป้าหมายยอดขาย สร้าง/แก้ไข/ลบ ดูความคืบหน้า
-2. **สินค้าของฉัน** — เพิ่มสินค้าใหม่, แก้ไข, เปิด/ปิดการขาย, **อัปโหลดรูปสินค้า** (Cloudinary CDN: ตั้งรูปหลัก / จัดเรียง / ลบ — สูงสุด 10 รูป, 5 MB/รูป)
+2. **สินค้าของฉัน** — เพิ่มสินค้าใหม่, แก้ไข, เปิด/ปิดการขาย, **อัปโหลดรูปสินค้า** (R2 CDN: ตั้งรูปหลัก / จัดเรียง / ลบ — สูงสุด 10 รูป, 10 MB/รูป)
 3. **Smart Reorder** — ระบบจำรอบการขายจริงของสินค้าแต่ละตัว เตือนเมื่อถึงเวลาเติมสต็อก + กดเติม 1 คลิก
 4. **ออเดอร์ของร้าน** — เห็นเฉพาะออเดอร์ที่มีสินค้าของร้านตัวเอง + ออเดอร์รายเดือนของลูกค้า ("สร้างออเดอร์รอบครบกำหนด")
 5. **รายได้** — คำนวณอัตโนมัติ:
@@ -256,7 +256,7 @@ bun run build           # build production (ได้ไฟล์แยก 4 ent
 | **Frontend 3 เว็บ** (velshop / velseller / velcenter) | **Vercel** — ฟรี, auto-deploy จาก GitHub push, custom domain ฟรี | สร้าง 3 โปรเจกต์คนละอัน (ด้านล่าง) |
 | **Backend + Realtime** (Convex) | **Convex (managed)** — push ผ่าน `npx convex deploy` ตอน build | ไม่ต้องรัน server เอง |
 | **ฐานข้อมูล Commerce** (Neon PostgreSQL) | **Neon (managed)** — ตั้งค่าใน Convex deployment env | ไม่ต้อง deploy |
-| **รูปสินค้า** (Cloudinary) | **Cloudinary (managed)** | ไม่ต้อง deploy |
+| **รูปสินค้า** (Cloudflare R2) | **Cloudflare R2 (managed)** | ไม่ต้อง deploy |
 
 > Vercel คือตัวเลือกหลักที่แนะนำ เพราะฟรี tier ครอบคลุมและ build command เดียว deploy ทั้ง Convex functions + หน้าเว็บ ทางเลือกอื่น (Netlify / Cloudflare Pages) ดูหัวข้อ **6.8**
 
@@ -268,7 +268,7 @@ GitHub: EnJirad/velnox-mvp (repo เดียว)
    ├── Vercel Project "velseller"  → velseller.vercel.app (หลังบ้านพ่อค้า)
    └── Vercel Project "velcenter"  → velcenter.vercel.app (หลังบ้านบริษัท)
               └── ทั้ง 3 ชี้ Convex production deployment ตัวเดียวกัน
-                    └── Neon (Commerce Core) + Cloudinary (รูปสินค้า)
+                    └── Neon (Commerce Core) + Cloudflare R2 (รูปสินค้า)
 ```
 
 ---
@@ -284,9 +284,11 @@ GitHub: EnJirad/velnox-mvp (repo เดียว)
 
 ```bash
 bunx convex env set DATABASE_URL "postgresql://<user>:<pass>@<host>.neon.tech/<db>?sslmode=require"
-bunx convex env set CLOUDINARY_CLOUD_NAME "<cloud-name>"
-bunx convex env set CLOUDINARY_API_KEY "<api-key>"
-bunx convex env set CLOUDINARY_API_SECRET "<api-secret>"
+bunx convex env set R2_ACCOUNT_ID "<cloudflare-account-id>"
+bunx convex env set R2_ACCESS_KEY_ID "<r2-access-key>"
+bunx convex env set R2_SECRET_ACCESS_KEY "<r2-secret-key>"
+bunx convex env set R2_BUCKET "<r2-bucket-name>"
+bunx convex env set R2_PUBLIC_DOMAIN "<r2-public-domain>"
 bunx convex env set SITE_URL "https://velshop.vercel.app"   # ใช้สร้างลิงก์ในอีเมล
 ```
 
@@ -330,7 +332,7 @@ Vercel → Project → **Settings → Environment Variables**:
 | `VITE_VELCENTER_URL` | `https://velcenter.vercel.app` | |
 
 > ✅ **ไม่ต้องตั้ง `VITE_CONVEX_URL`** — `convex deploy` inject ให้เองตอน build ผ่าน `--cmd-url-env-var-name VITE_CONVEX_URL`
-> ❌ **ไม่ต้องตั้งใน Vercel**: `DATABASE_URL`, `CLOUDINARY_*`, `SITE_URL` — อยู่ใน Convex deployment env แล้ว (ขั้น 6.2)
+> ❌ **ไม่ต้องตั้งใน Vercel**: `DATABASE_URL`, `R2_*`, `SITE_URL` — อยู่ใน Convex deployment env แล้ว (ขั้น 6.2)
 
 ---
 
@@ -371,7 +373,7 @@ Vercel → Project → **Settings → Rewrites & Redirects** → Rewrites → **
 | `VITE_CONVEX_URL` | อัตโนมัติจาก build command | — |
 | `VITE_SITE_BASENAME` / `VITE_VEL*_URL` | ✅ | — |
 | `DATABASE_URL` (Neon) | — | ✅ |
-| `CLOUDINARY_CLOUD_NAME` / `_API_KEY` / `_API_SECRET` | — | ✅ |
+| `R2_ACCOUNT_ID` / `_ACCESS_KEY_ID` / `_SECRET_ACCESS_KEY` / `_BUCKET` / `_PUBLIC_DOMAIN` | — | ✅ |
 | `SITE_URL` | — | ✅ |
 | `BOOTSTRAP_OWNER_SECRET` | — | ✅ (ตั้งก่อนเปิด velcenter ครั้งแรก — ใช้ครั้งเดียว แล้วปิดถาวร) |
 
@@ -396,7 +398,7 @@ Vercel → Project → **Settings → Rewrites & Redirects** → Rewrites → **
 |---|---|
 | หน้าว่าง หรือขึ้น `Did you forget to run convex dev?` | ยังไม่ได้ push schema / codegen → รัน `bun convex dev --once` |
 | เปิดร้าน / เพิ่มสินค้าแล้ว error เกี่ยวกับตาราง (เช่น `relation "sellers" does not exist`) | ยังไม่ได้สร้างตาราง Neon → รัน `DATABASE_URL="..." bun run db:migrate` |
-| อัปโหลดรูปสินค้าไม่ได้ (ขึ้น `Image storage is not configured`) | ยังไม่ได้ตั้ง Cloudinary env ครบทั้ง 3 ตัวใน Keys/API keys |
+| อัปโหลดรูปสินค้าไม่ได้ (ขึ้น `Image storage is not configured`) | ยังไม่ได้ตั้ง R2 env ครบทั้ง 5 ตัวใน Keys/API keys |
 | Typecheck error เกี่ยวกับ `_generated` | ไฟล์ codegen เก่า/หาย → รัน `bun convex dev --once` (ห้ามแก้ `_generated` ด้วยมือ) |
 | ล็อกอินแล้วพาไปผิดที่ / ตก 404 | ตรวจ `VITE_*_URL` — การข้ามเว็บใช้การโหลดหน้าใหม่ทั้งหน้า (ต้องเป็น URL จริง) |
 | คลิกไปเว็บอื่นแล้ว 404 | กำลัง preview ใน repo เดียวกันต้องใช้ path default (`/velshop.html` ฯลฯ) — deploy จริงต้องตั้ง `VITE_*_URL` |

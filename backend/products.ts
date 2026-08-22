@@ -4,7 +4,7 @@
  *
  * Product = catalog data + current price. Stock lives in the separate
  * `inventory` entity. Product images: the BINARY lives in object storage
- * (Cloudinary via src/backend/storage.ts), Neon `product_images` stores only
+ * (R2 via src/backend/storage.ts), Neon `product_images` stores only
  * metadata (url, storage key, alt, sort order, primary flag, dimensions).
  */
 import type { Db } from "./db";
@@ -54,7 +54,7 @@ function mapProduct(r: Record<string, any>): Product {
 
 function mapImage(r: Record<string, any>): ProductImage {
   const storage = isStorageConfigured() ? getStorage() : null;
-  const storageKey = r.storage_key ?? (storage ? storage.extractPublicId(r.url) : null);
+  const storageKey = r.storage_key ?? (storage ? storage.extractObjectKey(r.url) : null);
   const displayUrl = storage && storageKey ? storage.displayUrl(storageKey) : r.url;
   const thumbUrl = storage && storageKey ? storage.thumbUrl(storageKey) : r.url;
   return {
@@ -63,7 +63,7 @@ function mapImage(r: Record<string, any>): ProductImage {
     url: r.url,
     displayUrl,
     thumbUrl,
-    storageProvider: r.storage_provider ?? "cloudinary",
+    storageProvider: r.storage_provider ?? "r2",
     storageKey,
     alt: r.alt ?? null,
     sortOrder: Number(r.sort_order),
@@ -529,7 +529,7 @@ export async function addProductImage(
     [
       productId,
       input.url,
-      input.storageProvider ?? "cloudinary",
+      input.storageProvider ?? "r2",
       input.storageKey ?? null,
       input.alt ?? null,
       sortOrder,

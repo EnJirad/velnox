@@ -35,7 +35,7 @@ interface GoalCardProps {
 }
 
 export function GoalCard({ goal, onEdit, onDelete, onRecordProgress }: GoalCardProps) {
-  const meta = CATEGORY_META[goal.category];
+  const meta = CATEGORY_META[(goal.category ?? "other") as keyof typeof CATEGORY_META];
   const percent = goalPercent(goal);
   const achieved = isAchieved(goal);
   const atRisk = isAtRisk(goal);
@@ -56,7 +56,7 @@ export function GoalCard({ goal, onEdit, onDelete, onRecordProgress }: GoalCardP
             <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
               <span>{meta.label}</span>
               <span className="text-slate-300">•</span>
-              <span>{PERIOD_META[goal.period]}</span>
+              <span>{PERIOD_META[(goal.period ?? "monthly") as keyof typeof PERIOD_META]}</span>
             </p>
           </div>
         </div>

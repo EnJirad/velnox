@@ -51,7 +51,7 @@ export const overview = query({
       .reduce((sum, o) => sum + o.total, 0);
 
     const lowStock = products.filter(
-      (p) => p.reorderLevel > 0 && p.currentStock <= p.reorderLevel,
+      (p) => (p.reorderLevel ?? 0) > 0 && (p.currentStock ?? 0) <= (p.reorderLevel ?? 0),
     );
 
     const customers = users.filter(

@@ -34,6 +34,36 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ---------------------------------------------------------------------------
+-- 15. media — binary storage metadata (Cloudflare R2 is source of truth)
+--     Neon stores metadata only; binary lives in R2.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS media (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_type    TEXT NOT NULL
+                CHECK (owner_type IN ('user','product','shop','order','system')),
+  owner_id      UUID NOT NULL,
+  kind          TEXT NOT NULL
+                CHECK (kind IN ('avatar','cover','product_image','store_image','banner','document','other')),
+  object_key    TEXT NOT NULL UNIQUE,
+  cdn_url       TEXT NOT NULL,
+  mime_type     TEXT NOT NULL,
+  file_size     INTEGER,
+  width         INTEGER,
+  height        INTEGER,
+  status        TEXT NOT NULL DEFAULT 'processing'
+                CHECK (status IN ('processing','active','deleted')),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_media_owner ON media (owner_type, owner_id);
+
+DROP TRIGGER IF EXISTS trg_media_updated ON media;
+CREATE TRIGGER trg_media_updated
+  BEFORE UPDATE ON media
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ---------------------------------------------------------------------------
 -- 1. users — business attributes keyed by the Convex auth id (auth = Convex)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
@@ -46,12 +76,20 @@ CREATE TABLE IF NOT EXISTS users (
                 CHECK (role IN ('customer','seller','staff','admin','owner')),
   department    TEXT
                 CHECK (department IN ('marketing','sales','operations','finance','general')),
-  avatar_url    TEXT,                           -- profile photo (Cloudinary URL, metadata only)
-  cover_url     TEXT,                           -- profile cover photo (Cloudinary URL, metadata only)
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+  avatar_url    TEXT,                           -- profile photo CDN URL (R2 when set)
+  cover_url     TEXT,                           -- profile cover photo CDN URL (R2 when set)
+  avatar_media_id UUID REFERENCES media (id),  -- R2 media record (source of truth when set)
+  cover_media_id  UUID REFERENCES media (id),  -- R2 media record (source of truth when set)
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+
+DROP TRIGGER IF EXISTS trg_users_updated ON users;
+CREATE TRIGGER trg_users_updated
+  BEFORE UPDATE ON users
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ---------------------------------------------------------------------------
 -- 2. sellers — merchant who opened a shop with Velnox (User -> Seller -> Shop)
@@ -128,15 +166,15 @@ CREATE TRIGGER trg_products_updated
 
 -- ---------------------------------------------------------------------------
 -- 5. product_images — metadata ONLY; the binary lives in object storage
---    (Cloudinary via src/backend/storage.ts). storage_key = public_id needed
---    to delete the binary later.
+--    (Cloudflare R2 via src/backend/storage.ts). storage_key = R2 object key
+--    needed to delete the binary later.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS product_images (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id       UUID NOT NULL REFERENCES products (id) ON DELETE CASCADE,
   url              TEXT NOT NULL,               -- canonical CDN url (original)
-  storage_provider TEXT NOT NULL DEFAULT 'cloudinary',
-  storage_key      TEXT,                        -- cloudinary public_id / object key
+  storage_provider TEXT NOT NULL DEFAULT 'r2',
+  storage_key      TEXT,                        -- R2 object key (used to delete binary from storage)
   alt              TEXT,
   sort_order       INTEGER NOT NULL DEFAULT 0,
   is_primary       BOOLEAN NOT NULL DEFAULT false,
@@ -187,11 +225,19 @@ CREATE TABLE IF NOT EXISTS addresses (
   state          TEXT,
   postal_code    TEXT,
   country        TEXT NOT NULL DEFAULT 'TH',
+  latitude       NUMERIC(10,7),
+  longitude      NUMERIC(10,7),
   is_default     BOOLEAN NOT NULL DEFAULT false,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_addresses_user ON addresses (user_id);
+
+DROP TRIGGER IF EXISTS trg_addresses_updated ON addresses;
+CREATE TRIGGER trg_addresses_updated
+  BEFORE UPDATE ON addresses
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ---------------------------------------------------------------------------
 -- 8. orders — order header with frozen address snapshot + statuses
@@ -361,4 +407,58 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_due ON subscriptions (status, next_
 DROP TRIGGER IF EXISTS trg_subscriptions_updated ON subscriptions;
 CREATE TRIGGER trg_subscriptions_updated
   BEFORE UPDATE ON subscriptions
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- 16. behavioral_events — durable behavioral event store (Neon).
+--     Append-only. Receives events from Convex realtime layer so that
+--     intelligence history survives a Convex outage.
+--     Idempotent: unique (source, source_event_id) constraint.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS behavioral_events (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source            TEXT NOT NULL DEFAULT 'convex_customer_events',
+  source_event_id   TEXT NOT NULL,
+  user_id           UUID REFERENCES users (id),
+  anonymous_id      TEXT,
+  type              TEXT NOT NULL,
+  entity_type       TEXT,
+  entity_id         TEXT,
+  value             TEXT,
+  metadata          JSONB,
+  occurred_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (source, source_event_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_behavioral_events_user ON behavioral_events (user_id);
+CREATE INDEX IF NOT EXISTS idx_behavioral_events_type ON behavioral_events (type);
+CREATE INDEX IF NOT EXISTS idx_behavioral_events_occurred ON behavioral_events (occurred_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- 17. customer_profiles — derived customer intelligence (rebuilt from events).
+--     Non-critical: can be rebuilt from behavioral_events + orders.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS customer_profiles (
+  user_id                 UUID PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+  preferred_language      TEXT DEFAULT 'th',
+  preferred_currency      TEXT DEFAULT 'THB',
+  preferred_categories    TEXT[] DEFAULT '{}',
+  favorite_shop_ids       TEXT[] DEFAULT '{}',
+  favorite_product_ids    TEXT[] DEFAULT '{}',
+  average_order_value     NUMERIC(12,2),
+  purchase_frequency      TEXT,
+  total_orders            INTEGER DEFAULT 0,
+  lifetime_value          NUMERIC(12,2) DEFAULT 0,
+  last_purchase_at        TIMESTAMPTZ,
+  repeat_purchase_interval INTEGER,
+  customer_segment        TEXT,
+  last_synced_at          TIMESTAMPTZ,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+DROP TRIGGER IF EXISTS trg_customer_profiles_updated ON customer_profiles;
+CREATE TRIGGER trg_customer_profiles_updated
+  BEFORE UPDATE ON customer_profiles
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();

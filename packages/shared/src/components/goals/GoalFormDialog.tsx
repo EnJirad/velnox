@@ -64,11 +64,11 @@ export function GoalFormDialog({ open, onOpenChange, goal }: GoalFormDialogProps
         ? {
             title: goal.title,
             description: goal.description ?? "",
-            category: goal.category,
-            unit: goal.unit,
+            category: (goal.category ?? "other") as GoalCategory,
+            unit: goal.unit ?? "ครั้ง",
             targetValue: String(goal.targetValue),
             currentValue: String(goal.currentValue),
-            period: goal.period,
+            period: (goal.period ?? "monthly") as GoalPeriod,
             dueDate: toDateInputValue(goal.dueDate),
           }
         : defaultForm,

@@ -63,14 +63,14 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
         ? {
             name: product.name,
             category: product.category,
-            unit: product.unit,
+            unit: product.unit ?? "ชิ้น",
             currentStock: String(product.currentStock),
             reorderLevel: String(product.reorderLevel),
             price: product.price ? String(product.price) : "",
             description: product.description ?? "",
             published: product.published ?? false,
             estimatedCycleDays: product.estimatedCycleDays ? String(product.estimatedCycleDays) : "",
-            supplier: product.supplier ?? "",
+            supplier: (product as Record<string, unknown>)["supplier"] as string ?? "",
           }
         : defaultForm,
     );
@@ -122,10 +122,10 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
     setSaving(true);
     try {
       if (product) {
-        await updateProduct({ productId: product._id, ...baseArgs });
+        await updateProduct({ productId: product._id, imageUrl: product.imageUrl, inStock: product.inStock, ...baseArgs });
         toast.success("อัปเดตสินค้าแล้ว");
       } else {
-        await createProduct(baseArgs);
+        await createProduct({ imageUrl: "/placeholder.png", inStock: true, ...baseArgs, price: baseArgs.price ?? 0, description: baseArgs.description ?? "" });
         toast.success("เพิ่มสินค้าแล้ว");
       }
       onOpenChange(false);

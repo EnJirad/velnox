@@ -158,7 +158,7 @@ function ProductFormInner({ shop, product, onClose, onSaved }: InnerProps) {
       <DialogHeader>
         <DialogTitle>{current ? "แก้ไขสินค้า" : "เพิ่มสินค้าใหม่"}</DialogTitle>
         <DialogDescription>
-          จัดการสินค้าของร้าน {shop.name} — ราคา สต็อก และรูปภาพ (อัปโหลดผ่าน Cloudinary CDN)
+          จัดการสินค้าของร้าน {shop.name} — ราคา สต็อก และรูปภาพ (อัปโหลดผ่าน R2 CDN)
         </DialogDescription>
       </DialogHeader>
 

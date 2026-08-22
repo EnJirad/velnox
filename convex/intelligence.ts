@@ -21,7 +21,7 @@ export const recordInterest = mutation({
   handler: async (ctx, { productId }) => {
     const userId = await getAuthUserId(ctx);
     await ctx.db.insert("interests", {
-      userId: userId ?? undefined,
+      userId: userId as unknown as string,
       productId,
       viewedAt: Date.now(),
     });
@@ -61,7 +61,7 @@ export const recordBusinessEvent = mutation({
     await ctx.db.insert("businessEvents", {
       type,
       entityId,
-      payload,
+      context: payload,
       createdAt: Date.now(),
     });
   },

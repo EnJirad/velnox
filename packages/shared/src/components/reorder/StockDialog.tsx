@@ -61,7 +61,7 @@ export function StockDialog({ product, open, onOpenChange }: StockDialogProps) {
             บันทึกการขาย / ใช้ไป
           </DialogTitle>
           <DialogDescription>
-            {product.name} · สต็อกปัจจุบัน {formatNumber(product.currentStock)} {product.unit}
+            {product.name} · สต็อกปัจจุบัน {formatNumber(product.currentStock ?? 0)} {product.unit}
           </DialogDescription>
         </DialogHeader>
 
@@ -84,7 +84,7 @@ export function StockDialog({ product, open, onOpenChange }: StockDialogProps) {
             <p className="rounded-[10px] bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
               สต็อกจะเหลือ{" "}
               <span className="font-semibold text-slate-900">
-                {formatNumber(Math.max(0, product.currentStock - qty))} {product.unit}
+                {formatNumber(Math.max(0, (product.currentStock ?? 0) - qty))} {product.unit}
               </span>
             </p>
           )}

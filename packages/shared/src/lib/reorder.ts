@@ -83,7 +83,7 @@ export interface ReorderInfo {
  * learned purchase cycle and the current stock level.
  */
 export function reorderInfo(product: Product): ReorderInfo {
-  const lowStock = product.reorderLevel > 0 && product.currentStock <= product.reorderLevel;
+  const lowStock = (product.reorderLevel ?? 0) > 0 && (product.currentStock ?? 0) <= (product.reorderLevel ?? 0);
   const cycle = effectiveCycleDays(product);
   const since = daysSinceOrder(product);
 
@@ -125,7 +125,7 @@ export const STATUS_META: Record<
 /** Suggested order quantity: reuse the last order size when known. */
 export function suggestedQty(product: Product): number {
   if (product.lastPurchaseQty && product.lastPurchaseQty > 0) return product.lastPurchaseQty;
-  return Math.max(1, Math.ceil(product.reorderLevel * 2));
+  return Math.max(1, Math.ceil((product.reorderLevel ?? 0) * 2));
 }
 
 export function formatDays(days: number): string {

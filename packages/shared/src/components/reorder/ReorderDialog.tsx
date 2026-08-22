@@ -59,8 +59,8 @@ export function ReorderDialog({ product, open, onOpenChange }: ReorderDialogProp
       await recordPurchase({
         productId: product._id,
         quantity: qty,
-        cost: Number.isFinite(costNum) && costNum > 0 ? costNum : undefined,
-        note: note || undefined,
+        unitCost: Number.isFinite(costNum) && costNum > 0 ? costNum / qty : 0,
+        supplier: note || undefined,
       });
       toast.success(`สั่งซื้อซ้ำ "${product.name}" แล้ว`);
       onOpenChange(false);
@@ -134,7 +134,7 @@ export function ReorderDialog({ product, open, onOpenChange }: ReorderDialogProp
             <p className="rounded-[10px] bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
               สต็อกจะกลายเป็น{" "}
               <span className="font-semibold text-slate-900">
-                {formatNumber(product.currentStock + qty)} {product.unit}
+                {formatNumber((product.currentStock ?? 0) + qty)} {product.unit}
               </span>
               {" "}· ระบบจะจำรอบการสั่งนี้เพื่อเตือนครั้งถัดไป
             </p>

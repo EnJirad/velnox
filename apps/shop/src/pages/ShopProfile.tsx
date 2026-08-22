@@ -1,4 +1,6 @@
 import { ProfileImageUpload } from "@/components/shop/ProfileImageUpload";
+import { AvatarImage } from "@velnox/shared/components/ui/avatar-image";
+import { CoverImage } from "@velnox/shared/components/ui/cover-image";
 import { ShopFooter } from "@/components/shop/ShopFooter";
 import { ShopHeader } from "@/components/shop/ShopHeader";
 import { useLanguage } from "@/lib/i18n";
@@ -72,6 +74,7 @@ export default function ShopProfile() {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -164,17 +167,11 @@ export default function ShopProfile() {
             <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
               {/* Cover */}
               <div className="relative h-40 bg-gradient-to-r from-[#0f766e] via-[#10B981] to-[#34d399] sm:h-44">
-                {coverSrc ? (
-                  <img
-                    src={coverSrc}
-                    alt={t("profile.coverAlt", { name: displayName || "VelShop" })}
-                    className="absolute inset-0 size-full object-cover"
-                    onError={(e) => {
-                      // Spec §89: never show a broken image — fall back to the gradient.
-                      (e.currentTarget as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                ) : null}
+                <CoverImage
+                  src={coverSrc}
+                  alt={t("profile.coverAlt", { name: displayName || "VelShop" })}
+                  className="absolute inset-0 size-full object-cover"
+                />
                 <div className="absolute bottom-3 right-3">
                   <ProfileImageUpload
                     kind="cover"
@@ -192,20 +189,19 @@ export default function ShopProfile() {
               {/* Avatar + info */}
               <div className="px-5 pb-5">
                 <div className="relative -mt-12 flex w-fit">
-                  <span className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-[#ECFDF5] text-3xl font-bold text-[#10B981] shadow-sm">
-                    {avatarSrc ? (
-                      <img
-                        src={avatarSrc}
-                        alt={t("profile.avatarAlt", { name: displayName || "VelShop" })}
-                        className="size-full object-cover"
-                        onError={(e) => {
-                          // Spec §89: broken avatar → initial-letter fallback.
-                          (e.currentTarget as HTMLImageElement).style.display = "none";
-                        }}
-                      />
-                    ) : (
-                      (displayName || "?").slice(0, 1).toUpperCase()
-                    )}
+                  <span
+                    className={`flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white shadow-sm ${
+                      avatarSrc
+                        ? "bg-transparent"
+                        : "bg-[#ECFDF5] text-3xl font-bold text-[#10B981]"
+                    }`}
+                  >
+                    <AvatarImage
+                      src={avatarSrc}
+                      alt={t("profile.avatarAlt", { name: displayName || "VelShop" })}
+                      className="size-full object-cover"
+                      fallback={<>{(displayName || "?").slice(0, 1).toUpperCase()}</>}
+                    />
                   </span>
                   <span className="absolute -bottom-1 -right-1">
                     <ProfileImageUpload
@@ -220,6 +216,8 @@ export default function ShopProfile() {
                     </ProfileImageUpload>
                   </span>
                 </div>
+
+
 
                 <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">

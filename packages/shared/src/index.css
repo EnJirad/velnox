@@ -150,3 +150,21 @@
 :lang(my) {
   line-height: 1.55;
 }
+
+/* ─── Web-app zoom policy ───────────────────────────────────────────────
+ * Page zoom: DISABLED (touch-action on body prevents pinch-to-zoom)
+ * Map zoom:  ENABLED (Leaflet captures multi-touch on .leaflet-container)
+ * Double-tap: disabled on page via manipulation, preserved on map
+ * ────────────────────────────────────────────────────────────────────── */
+body {
+  touch-action: pan-x pan-y;
+}
+
+.leaflet-container {
+  touch-action: none !important;
+}
+
+/* Zoom controls must remain clickable above the center pin */
+.leaflet-control-zoom {
+  z-index: 700 !important;
+}

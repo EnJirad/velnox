@@ -11,7 +11,7 @@ import { useAuth } from "@velnox/shared/hooks/use-auth";
 import { useCart } from "@/lib/cart";
 import { useLanguage } from "@/lib/i18n";
 import { formatBaht } from "@velnox/shared/lib/shop";
-import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { LogIn, Minus, Plus, ShoppingCart, Trash2, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router";
 
 interface CartDrawerProps {
@@ -30,6 +30,11 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
     navigate(isAuthenticated ? "/checkout" : "/auth?returnTo=/checkout");
   };
 
+  const goLogin = () => {
+    onOpenChange(false);
+    navigate("/auth?returnTo=/");
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
@@ -46,7 +51,37 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
           <SheetDescription className="sr-only">{t("cartDrawer.summary")}</SheetDescription>
         </SheetHeader>
 
-        {lines.length === 0 ? (
+        {!isAuthenticated ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 py-16 text-center">
+            <span className="flex size-14 items-center justify-center rounded-2xl bg-slate-100">
+              <ShoppingCart className="size-6 text-slate-400" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">กรุณาสมัครสมาชิกหรือเข้าสู่ระบบก่อนใช้งานตะกร้า</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">เข้าสู่ระบบเพื่อบันทึกสินค้าในตะกร้าและดำเนินการชำระเงิน</p>
+            </div>
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
+              <Button
+                className="gap-1.5 bg-slate-900 text-white hover:bg-slate-800"
+                onClick={goLogin}
+              >
+                <LogIn className="size-4" />
+                เข้าสู่ระบบ
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-1.5 border-slate-200 text-slate-700"
+                onClick={() => {
+                  onOpenChange(false);
+                  navigate("/auth?returnTo=/");
+                }}
+              >
+                <UserPlus className="size-4" />
+                สมัครสมาชิก
+              </Button>
+            </div>
+          </div>
+        ) : lines.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center">
             <span className="flex size-14 items-center justify-center rounded-2xl bg-slate-100">
               <ShoppingCart className="size-6 text-slate-400" />

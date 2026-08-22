@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as actions_profile from "../actions/profile.js";
 import type * as auth from "../auth.js";
 import type * as auth_emailOtp from "../auth/emailOtp.js";
 import type * as auth_redirect from "../auth_redirect.js";
@@ -21,12 +22,16 @@ import type * as employeeAuthHelpers from "../employeeAuthHelpers.js";
 import type * as goals from "../goals.js";
 import type * as http from "../http.js";
 import type * as intelligence from "../intelligence.js";
+import type * as lib_r2presign from "../lib/r2presign.js";
 import type * as lib_serialize from "../lib/serialize.js";
+import type * as lib_storage from "../lib/storage.js";
 import type * as memory from "../memory.js";
 import type * as memoryEvents from "../memoryEvents.js";
+import type * as mutations from "../mutations.js";
 import type * as orders from "../orders.js";
 import type * as products from "../products.js";
 import type * as rateLimit from "../rateLimit.js";
+import type * as seed from "../seed.js";
 import type * as sellerOps from "../sellerOps.js";
 import type * as storefront from "../storefront.js";
 import type * as stripe from "../stripe.js";
@@ -40,6 +45,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "actions/profile": typeof actions_profile;
   auth: typeof auth;
   "auth/emailOtp": typeof auth_emailOtp;
   auth_redirect: typeof auth_redirect;
@@ -53,12 +59,16 @@ declare const fullApi: ApiFromModules<{
   goals: typeof goals;
   http: typeof http;
   intelligence: typeof intelligence;
+  "lib/r2presign": typeof lib_r2presign;
   "lib/serialize": typeof lib_serialize;
+  "lib/storage": typeof lib_storage;
   memory: typeof memory;
   memoryEvents: typeof memoryEvents;
+  mutations: typeof mutations;
   orders: typeof orders;
   products: typeof products;
   rateLimit: typeof rateLimit;
+  seed: typeof seed;
   sellerOps: typeof sellerOps;
   storefront: typeof storefront;
   stripe: typeof stripe;

@@ -25,6 +25,12 @@ export default function ShopCart() {
   const navigate = useNavigate();
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  // Redirect unauthenticated visitors to login
+  if (!isLoading && !isAuthenticated) {
+    navigate("/auth?returnTo=/cart", { replace: true });
+    return null;
+  }
+
   const grouped = useMemo(() => {
     const map = new Map<string, typeof lines>();
     for (const line of lines) {

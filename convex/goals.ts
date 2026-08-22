@@ -11,19 +11,6 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getCurrentUser } from "./users";
 
-// Shared validators for goal fields (kept in sync with schema.ts)
-export const goalCategory = v.union(
-  v.literal("revenue"),
-  v.literal("orders"),
-  v.literal("customers"),
-  v.literal("other"),
-);
-export const goalPeriod = v.union(
-  v.literal("monthly"),
-  v.literal("quarterly"),
-  v.literal("yearly"),
-);
-
 /** List all goals owned by the signed-in user. */
 export const list = query({
   args: {},
@@ -43,11 +30,20 @@ export const create = mutation({
   args: {
     title: v.string(),
     description: v.optional(v.string()),
-    category: goalCategory,
+    category: v.union(
+      v.literal("revenue"),
+      v.literal("orders"),
+      v.literal("customers"),
+      v.literal("other"),
+    ),
     unit: v.string(),
     targetValue: v.number(),
     currentValue: v.number(),
-    period: goalPeriod,
+    period: v.union(
+      v.literal("monthly"),
+      v.literal("quarterly"),
+      v.literal("yearly"),
+    ),
     dueDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -76,11 +72,20 @@ export const update = mutation({
     goalId: v.id("goals"),
     title: v.optional(v.string()),
     description: v.optional(v.string()),
-    category: v.optional(goalCategory),
+    category: v.optional(v.union(
+      v.literal("revenue"),
+      v.literal("orders"),
+      v.literal("customers"),
+      v.literal("other"),
+    )),
     unit: v.optional(v.string()),
     targetValue: v.optional(v.number()),
     currentValue: v.optional(v.number()),
-    period: v.optional(goalPeriod),
+    period: v.optional(v.union(
+      v.literal("monthly"),
+      v.literal("quarterly"),
+      v.literal("yearly"),
+    )),
     dueDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {

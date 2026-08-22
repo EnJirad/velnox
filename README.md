@@ -58,7 +58,7 @@ for all apps), `VITE_VELSHOP_URL` / `VITE_VELSELLER_URL` / `VITE_VELCENTER_URL`
 `VITE_SITE_BASENAME` (empty for standalone domain deploy). See
 [`docs/ENVIRONMENT.md`](./docs/ENVIRONMENT.md) and each app's README.
 
-Backend secrets (`DATABASE_URL`, `CLOUDINARY_*`, `JWT_PRIVATE_KEY`, `SITE_URL`,
+Backend secrets (`DATABASE_URL`, `R2_*`, `JWT_PRIVATE_KEY`, `SITE_URL`,
 …) are **Convex deployment env vars** — set them in the Keys/API keys UI,
 never in a Vite `.env`.
 

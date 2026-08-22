@@ -51,7 +51,7 @@ export const createSubscription = mutation({
   },
 });
 
-/** The signed-in customer's subscriptions (velshop \"การสั่งรายเดือน\"). */
+/** The signed-in customer's subscriptions (velshop "การสั่งรายเดือน"). */
 export const mySubscriptions = query({
   args: {},
   handler: async (ctx) => {
@@ -59,12 +59,12 @@ export const mySubscriptions = query({
     if (user === null) return [];
     const subs = await ctx.db
       .query("subscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", user._id as unknown as string))
       .order("desc")
       .collect();
     const rows: { subscription: Doc<"subscriptions">; product: Doc<"products"> | null }[] = [];
     for (const sub of subs) {
-      rows.push({ subscription: sub, product: await ctx.db.get(sub.productId) });
+      rows.push({ subscription: sub, product: await ctx.db.get(sub.productId as Id<"products">) });
     }
     return rows;
   },
@@ -115,8 +115,8 @@ export const activeSubscriptions = query({
     for (const sub of subs) {
       rows.push({
         subscription: sub,
-        product: await ctx.db.get(sub.productId),
-        customer: await ctx.db.get(sub.userId),
+        product: await ctx.db.get(sub.productId as Id<"products">),
+        customer: await ctx.db.get(sub.userId as Id<"users">),
       });
     }
     return rows;
@@ -147,33 +147,32 @@ export const processDueSubscriptions = mutation({
 
     let created = 0;
     for (const sub of due) {
-      const product = await ctx.db.get(sub.productId);
+      const product = await ctx.db.get(sub.productId as Id<"products">);
       if (!product || !product.published || product.price === undefined) continue;
-      if (product.currentStock < sub.quantity) continue; // skip, out of stock
-      const customer = await ctx.db.get(sub.userId);
+      if ((product.currentStock ?? 0) < sub.quantity) continue; // skip, out of stock
+      const customer = await ctx.db.get(sub.userId as Id<"users">);
 
       const subtotal = Math.round(product.price * sub.quantity * 100) / 100;
       const orderId = await ctx.db.insert("orders", {
         userId: sub.userId,
+        items: [{
+          productId: product._id as unknown as string,
+          name: product.name,
+          price: product.price,
+          quantity: sub.quantity,
+          imageUrl: product.imageUrl,
+        }],
         status: "pending",
-        customerName: customer?.name ?? "สมาชิกสั่งรายเดือน",
-        customerPhone: "—",
         total: subtotal,
-        itemCount: sub.quantity,
-        createdAt: now,
-        updatedAt: now,
       });
       await ctx.db.insert("orderItems", {
-        orderId,
-        productId: product._id,
+        orderId: orderId as unknown as string,
         productName: product.name,
-        unit: product.unit,
         quantity: sub.quantity,
-        price: product.price,
         subtotal,
       });
       await ctx.db.patch(product._id, {
-        currentStock: Math.max(0, product.currentStock - sub.quantity),
+        currentStock: Math.max(0, (product.currentStock ?? 0) - sub.quantity),
         updatedAt: now,
       });
       await ctx.db.patch(sub._id, {

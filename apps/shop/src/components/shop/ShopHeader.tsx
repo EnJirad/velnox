@@ -91,15 +91,25 @@ export function ShopHeader() {
             <Search className="size-5" />
           </Button>
 
+          {/* Language — desktop full trigger, mobile compact icon */}
           <div className="hidden md:block">
             <LanguageSwitcher variant="desktop" />
+          </div>
+          <div className="md:hidden">
+            <LanguageSwitcher variant="mobile" />
           </div>
 
           <Button
             variant="ghost"
             size="icon"
             className="relative size-10 cursor-pointer rounded-[10px] text-slate-600 hover:bg-slate-100"
-            onClick={() => setCartOpen(true)}
+            onClick={() => {
+              if (!isAuthenticated && !isLoading) {
+                navigate("/auth?returnTo=/");
+              } else {
+                setCartOpen(true);
+              }
+            }}
             aria-label={t("header.ariaCart")}
           >
             <ShoppingCart className="size-5" />
