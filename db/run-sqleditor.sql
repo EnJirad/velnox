@@ -89,6 +89,10 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users (status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_employee_id ON users (employee_id) WHERE employee_id IS NOT NULL;
+-- Normalized email unique index (prevents duplicate users with same email)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_normalized_email
+  ON users (LOWER(TRIM(email)))
+  WHERE email IS NOT NULL;
 DROP TRIGGER IF EXISTS trg_users_updated ON users;
 CREATE TRIGGER trg_users_updated BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 

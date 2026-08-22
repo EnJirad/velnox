@@ -1,9 +1,9 @@
 # Velnox AI Handoff
 
 > **Last Updated:** 2026-08-22
-> **Latest Migration:** 015_customer_intelligence.sql
+> **Latest Migration:** 016_canonical_identity.sql
 > **Total Tables:** 42
-> **Total Migrations:** 15 (002–015)
+> **Total Migrations:** 16 (002–016)
 
 ---
 
@@ -220,7 +220,8 @@ db/
     ├── 012_employee_auth.sql
     ├── 013_product_moderation.sql
     ├── 014_profile_images.sql
-    └── 015_customer_intelligence.sql
+    ├── 015_customer_intelligence.sql
+    └── 016_canonical_identity.sql
 ```
 
 ---

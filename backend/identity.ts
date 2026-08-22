@@ -7,11 +7,24 @@
  *   - requireSeller       — user owns a Seller
  *   - requireSellerForShop — user owns the shop
  *   - requirePermission   — granular staff permission (spec §47)
+ *
+ * CANONICAL IDENTITY RULE:
+ *   ONE REAL USER → ONE CANONICAL Neon users.id
+ *
+ *   Identity resolution (in order):
+ *     1. Match by convex_id (Convex auth subject) → existing user
+ *     2. Match by normalized email → link auth identity to existing user
+ *     3. Create new user only if neither match exists
+ *
+ *   Race condition prevention:
+ *     All identity resolution runs inside a PostgreSQL transaction with
+ *     SELECT FOR UPDATE to prevent duplicate user creation under concurrency.
+ *
  * All checks run against the Neon source of truth; the frontend role is never
  * trusted on its own.
  */
 import type { ActionCtx } from "../convex/_generated/server";
-import { getDb } from "./db";
+import { getDb, getPool } from "./db";
 import { AppError, authRequired, forbidden } from "./errors";
 import { getSellerByOwner } from "./sellers";
 import { requirePermission as checkPermission } from "./permissions";
@@ -23,6 +36,13 @@ export interface Identity {
   email: string | null;
   name: string | null;
   user: User;
+}
+
+/** Normalize email for canonical matching: trim + lowercase. */
+function normalizeEmail(email: string | null | undefined): string | null {
+  if (!email) return null;
+  const normalized = email.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
 }
 
 function rowToUser(row: Record<string, unknown>) {
@@ -40,70 +60,99 @@ function rowToUser(row: Record<string, unknown>) {
   };
 }
 
+/**
+ * Resolve the canonical Neon user for the authenticated Convex identity.
+ *
+ * Uses a PostgreSQL transaction with SELECT FOR UPDATE to prevent
+ * race conditions where two concurrent requests create duplicate users.
+ *
+ * Resolution order:
+ *   1. Find by convex_id (fast path — existing identity mapping)
+ *   2. Find by normalized email (link new auth identity to existing user)
+ *   3. Insert new user (only when no match exists)
+ */
 export async function requireIdentity(ctx: ActionCtx): Promise<Identity> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw authRequired();
-  const db = getDb();
 
-  // --- Strategy 1: find existing user by convex_id (fast path) ---
-  const existing = await db(
-    "SELECT * FROM users WHERE convex_id = $1 LIMIT 1",
-    [identity.subject],
-  );
-  if (existing[0]) {
-    // Merge name/email from auth provider (never overwrite avatar/profile)
-    await db(
-      `UPDATE users
-         SET email = COALESCE($2, email),
-             name  = COALESCE($3, name)
-       WHERE convex_id = $1`,
-      [identity.subject, identity.email ?? null, identity.name ?? null],
-    );
-    return {
-      subject: identity.subject,
-      email: identity.email ?? null,
-      name: identity.name ?? null,
-      user: rowToUser(existing[0]),
-    };
-  }
+  const subject = identity.subject;
+  const authEmail = normalizeEmail(identity.email);
+  const authName = identity.name ?? null;
 
-  // --- Strategy 2: email already exists with a different convex_id → merge ---
-  if (identity.email) {
-    const byEmail = await db(
-      "SELECT * FROM users WHERE email = $1 LIMIT 1",
-      [identity.email],
+  // Use a transaction to prevent race conditions during user creation.
+  // withTransaction handles BEGIN/COMMIT/ROLLBACK and connection release.
+  const { withTransaction } = await import("./db");
+  const user = await withTransaction(async (client) => {
+    // ─── PRIORITY 1: Match by convex_id (fast path) ────────────────────
+    // This is the most common case: user has logged in before with this
+    // Convex auth identity. SELECT FOR UPDATE prevents concurrent
+    // transactions from modifying the same row.
+    const existingById = await client.query(
+      "SELECT * FROM users WHERE convex_id = $1 LIMIT 1 FOR UPDATE",
+      [subject],
     );
-    if (byEmail[0]) {
-      // Link this new convex_id to the existing user record.
-      // All profile data (avatar, cover, addresses, orders) is preserved.
-      await db(
-        "UPDATE users SET convex_id = $1, name = COALESCE($2, name) WHERE id = $3",
-        [identity.subject, identity.name ?? null, byEmail[0].id],
+
+    if (existingById.rows[0]) {
+      // Update name/email from auth provider if they changed (e.g., user
+      // updated their Google name). Never overwrite avatar/profile data.
+      await client.query(
+        `UPDATE users
+           SET email = COALESCE($2, email),
+               name  = COALESCE($3, name)
+         WHERE convex_id = $1`,
+        [subject, authEmail, authName],
       );
-      return {
-        subject: identity.subject,
-        email: identity.email,
-        name: identity.name ?? null,
-        user: rowToUser({ ...byEmail[0], convex_id: identity.subject }),
-      };
+      return existingById.rows[0];
     }
-  }
 
-  // --- Strategy 3: brand-new user → insert ---
-  const rows = await db(
-    `INSERT INTO users (convex_id, email, name, role)
-       VALUES ($1, $2, $3, 'customer')
-       ON CONFLICT (convex_id) DO UPDATE SET
-         email = COALESCE(EXCLUDED.email, users.email),
-         name  = COALESCE(EXCLUDED.name, users.name)
-       RETURNING *`,
-    [identity.subject, identity.email ?? null, identity.name ?? null],
-  );
+    // ─── PRIORITY 2: Match by normalized email ─────────────────────────
+    // A user exists with this email but a different convex_id. This can
+    // happen when:
+    //   - User logged in with Email OTP first, then Google (new subject)
+    //   - Convex Auth generated a new subject after session expiry
+    //   - User cleared cookies and re-authenticated
+    //
+    // We LINK the new auth identity to the existing Neon user.
+    // The existing user.id is preserved — all business data stays intact.
+    if (authEmail) {
+      const existingByEmail = await client.query(
+        "SELECT * FROM users WHERE LOWER(TRIM(email)) = $1 LIMIT 1 FOR UPDATE",
+        [authEmail],
+      );
+
+      if (existingByEmail.rows[0]) {
+        // Link the new convex_id to the existing user.
+        // Only update convex_id and name — preserve everything else.
+        await client.query(
+          "UPDATE users SET convex_id = $1, name = COALESCE($2, name) WHERE id = $3",
+          [subject, authName, existingByEmail.rows[0].id],
+        );
+        return { ...existingByEmail.rows[0], convex_id: subject };
+      }
+    }
+
+    // ─── PRIORITY 3: Brand-new user → INSERT ───────────────────────────
+    // Neither convex_id nor email matched. This is a first-time login.
+    // ON CONFLICT (convex_id) handles the extremely unlikely case where
+    // another transaction inserted the same convex_id between our SELECT
+    // and INSERT (defensive programming).
+    const insertResult = await client.query(
+      `INSERT INTO users (convex_id, email, name, role)
+         VALUES ($1, $2, $3, 'customer')
+         ON CONFLICT (convex_id) DO UPDATE SET
+           email = COALESCE(EXCLUDED.email, users.email),
+           name  = COALESCE(EXCLUDED.name, users.name)
+         RETURNING *`,
+      [subject, authEmail, authName],
+    );
+    return insertResult.rows[0];
+  });
+
   return {
-    subject: identity.subject,
-    email: identity.email ?? null,
-    name: identity.name ?? null,
-    user: rowToUser(rows[0]),
+    subject,
+    email: authEmail,
+    name: authName,
+    user: rowToUser(user),
   };
 }
 
@@ -125,7 +174,8 @@ export async function requireSeller(ctx: ActionCtx): Promise<{ identity: Identit
 /** Require the seller to own the shop. */
 export async function requireSellerForShop(ctx: ActionCtx, shopId: string): Promise<{ identity: Identity; seller: Seller }> {
   const { identity, seller } = await requireSeller(ctx);
-  const rows = await getDb()("SELECT 1 FROM shops WHERE id = $1 AND seller_id = $2 LIMIT 1", [shopId, seller.id]);
+  const db = getDb();
+  const rows = await db("SELECT 1 FROM shops WHERE id = $1 AND seller_id = $2 LIMIT 1", [shopId, seller.id]);
   if (!rows[0]) throw forbidden("ร้านนี้ไม่ใช่ของคุณ");
   return { identity, seller };
 }
