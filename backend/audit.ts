@@ -21,22 +21,33 @@ export interface AuditInput {
 }
 
 export async function audit(db: Db, input: AuditInput): Promise<void> {
-  await db(
-    `INSERT INTO audit_logs
-       (actor_id, actor_role, action, entity_type, entity_id, before, after, ip_address, user_agent)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)`,
-    [
-      input.actorId,
-      input.actorRole,
-      input.action,
-      input.entityType ?? null,
-      input.entityId ?? null,
-      input.before ? JSON.stringify(input.before) : null,
-      input.after ? JSON.stringify(input.after) : null,
-      input.ipAddress ?? null,
-      input.userAgent ?? null,
-    ],
-  );
+  try {
+    await db(
+      `INSERT INTO audit_logs
+         (actor_id, actor_role, action, entity_type, entity_id, before, after, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)`,
+      [
+        input.actorId,
+        input.actorRole,
+        input.action,
+        input.entityType ?? null,
+        input.entityId ?? null,
+        input.before ? JSON.stringify(input.before) : null,
+        input.after ? JSON.stringify(input.after) : null,
+        input.ipAddress ?? null,
+        input.userAgent ?? null,
+      ],
+    );
+  } catch (err) {
+    // Best-effort: if audit_logs table doesn't exist yet (migration not applied),
+    // log a warning instead of crashing the entire request.
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('relation "audit_logs"') || msg.includes('does not exist')) {
+      console.warn(`[audit] Skipped — audit_logs table not found. Run: bun run db:migrate`);
+    } else {
+      console.error("[audit] Failed to write audit log:", msg);
+    }
+  }
 }
 
 export interface ListAuditOptions {

@@ -26,8 +26,7 @@ import { join } from "node:path";
 import { getPool } from "../backend/db";
 
 const MIGRATION_TABLE = "_schema_migrations";
-
-const pool = getPool();
+let pool!: ReturnType<typeof getPool>;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -99,6 +98,7 @@ function validateMigrations(files: string[]): void {
 // ── Main ────────────────────────────────────────────────────────────────────
 
 try {
+  pool = getPool();
   log("Database connected");
 
   // Check if this is a completely empty database (no tables at all)
@@ -202,5 +202,5 @@ try {
   );
   process.exitCode = 1;
 } finally {
-  await pool.end();
+  if (pool) await pool.end();
 }
