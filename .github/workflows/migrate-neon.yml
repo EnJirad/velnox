@@ -29,27 +29,121 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Velnox uses a plain-SQL migration system (db/schema.sql + db/migrations/*.sql
-      # applied by db/migrate.ts) — NOT Prisma. The repository has no
-      # prisma/schema.prisma, so `bunx prisma validate` can never pass here.
+      # ---------------------------------------------
+      # Validate migration files
+      # ---------------------------------------------
       - name: Check migrations
         run: |
-          test -f db/schema.sql && echo "OK db/schema.sql"
-          test -f db/migrate.ts && echo "OK db/migrate.ts (runner)"
-          test -d db/migrations && ls db/migrations/*.sql >/dev/null \
-            && echo "OK db/migrations/ ($(ls db/migrations/*.sql | wc -l) files)"
+          set -e
 
+          test -f db/schema.sql
+          test -f db/migrate.ts
+          test -d db/migrations
+
+          echo "OK db/schema.sql"
+          echo "OK db/migrate.ts"
+
+          COUNT=$(find db/migrations -maxdepth 1 -type f -name "*.sql" | wc -l)
+
+          if [ "$COUNT" -eq 0 ]; then
+            echo "ERROR: No SQL migrations found"
+            exit 1
+          fi
+
+          echo "Found $COUNT migration files"
+
+      # ---------------------------------------------
+      # Verify DATABASE_URL exists
+      # ---------------------------------------------
+      - name: Check DATABASE_URL
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -e
+
+          if [ -z "$DATABASE_URL" ]; then
+            echo "ERROR: DATABASE_URL GitHub Repository Secret is missing"
+            echo ""
+            echo "Create:"
+            echo "Repository Settings"
+            echo "→ Secrets and variables"
+            echo "→ Actions"
+            echo "→ Repository secrets"
+            echo "→ DATABASE_URL"
+            exit 1
+          fi
+
+          echo "DATABASE_URL is configured"
+
+      # ---------------------------------------------
+      # Deploy database migrations
+      #
+      # db:migrate MUST:
+      #
+      # 1. Create migration tracking table if missing
+      # 2. Detect empty database
+      # 3. Apply ALL migrations on empty database
+      # 4. Skip already-applied migrations
+      # 5. Apply only new migrations on existing database
+      # 6. Never delete existing tables/data
+      # ---------------------------------------------
       - name: Deploy Neon migrations
-        run: bun run db:migrate
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -e
 
+          echo "========================================="
+          echo "Starting Velnox Neon migration"
+          echo "========================================="
+
+          bun run db:migrate
+
+          echo "========================================="
+          echo "Migration completed"
+          echo "========================================="
+
+      # ---------------------------------------------
+      # Verify schema
+      # ---------------------------------------------
       - name: Verify database (schema smoke test)
-        run: bun run db:smoke
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -e
 
-      - name: Verify database (consistency check, read-only)
-        run: bun run db:consistency
+          echo "Running database smoke test..."
+
+          bun run db:smoke
+
+          echo "Database smoke test passed"
+
+      # ---------------------------------------------
+      # Verify database consistency
+      # ---------------------------------------------
+      - name: Verify database (consistency check)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -e
+
+          echo "Running database consistency check..."
+
+          bun run db:consistency
+
+          echo "Database consistency check passed"
+
+      # ---------------------------------------------
+      # Final result
+      # ---------------------------------------------
+      - name: Migration completed successfully
+        run: |
+          echo ""
+          echo "========================================="
+          echo " VELNOX DATABASE MIGRATION SUCCESS"
+          echo "========================================="
+          echo ""
+          echo "Neon database has been synchronized."
+          echo "Existing migrations were preserved."
+          echo "New migrations were applied."
+          echo "Database verification passed."
